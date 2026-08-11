@@ -1,0 +1,36 @@
+{
+  "schema": "gpudrive_runtime_pins",
+  "schema_version": 1,
+  "gpudrive": {
+    "repository": "https://github.com/Emerge-Lab/gpudrive.git",
+    "commit": "aa48a431ed127a37610cc2176db30ec73d0c55df",
+    "tree": "33240941cc9e2504f2cbc9f61f7169b2a7d5ac25",
+    "package_version": "0.4.0",
+    "uv_lock_sha256": "d4f6fe3df752ae9f5cf4fd3e8c510870273fefc4e3c0f3df401f16a62ef7a04d",
+    "submodules": {
+      "external/json": "0457de21cffb298c22b629e538036bfeb96130b7",
+      "external/madrona": "4bda33465340fabc2e61fb27f95aa04795a15466"
+    }
+  },
+  "reference_runtime": {
+    "platform": "linux",
+    "architecture": "amd64",
+    "python": "3.11.9",
+    "cuda": "12.4",
+    "base_image": "nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04",
+    "base_image_index_digest": "sha256:622e78a1d02c0f90ed900e3985d6c975d8e2dc9ee5e61643aed587dcf9129f42",
+    "base_image_amd64_digest": "sha256:0a1cb6e7bd047a1067efe14efdf0276352d5ca643dfd77963dab1a4f05a003a4",
+    "uv": {
+      "version": "0.12.3",
+      "wheel_url": "https://files.pythonhosted.org/packages/8d/c4/97fdd4fca11d06633bb500849f70e4e6b201bcba3833894732e709be2d60/uv-0.12.3-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "wheel_sha256": "1482d1462b1aecd18ee33627363fe1c63d6a194f12d40d37efc446d9e0d800a1"
+    }
+  },
+  "smoke_scene": {
+    "relative_path": "data/processed/examples/tfrecord-00000-of-01000_325.json",
+    "sha256": "69bd2b9ae49d43745651262abf3956309e9c0092ca24aff72e0f9abb32f9b948",
+    "scenario_id": "ef3a8f65142f41ac",
+    "source_sdc_track_index": 61,
+    "sdc_object_id": 271
+  }
+}

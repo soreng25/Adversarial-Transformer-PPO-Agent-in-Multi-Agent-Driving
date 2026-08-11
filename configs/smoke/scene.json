@@ -1,0 +1,74 @@
+{
+  "schema": "gpudrive_scene_smoke",
+  "schema_version": 1,
+  "purpose": "installation_and_determinism_only",
+  "scene_pin": "smoke_scene",
+  "loader": {
+    "batch_size": 1,
+    "dataset_size": 1,
+    "sample_with_replacement": false,
+    "seed": 42,
+    "shuffle": false
+  },
+  "environment": {
+    "num_worlds": 1,
+    "max_cont_agents": 1,
+    "dynamics_model": "classic",
+    "collision_behavior": "ignore",
+    "init_mode": "all_non_trivial",
+    "init_steps": 0,
+    "remove_non_vehicles": false,
+    "reward_type": "sparse_on_goal_achieved",
+    "ego_state": true,
+    "partner_obs": true,
+    "road_map_obs": true,
+    "norm_obs": true
+  },
+  "action": {
+    "type": "discrete",
+    "neutral_index": 45,
+    "neutral_decoded": [0.0, 0.0, 0.0],
+    "commands": [
+      {
+        "name": "neutral_discrete_45",
+        "kind": "discrete",
+        "index": 45,
+        "expected_accel_steer_head": [0.0, 0.0, 0.0]
+      },
+      {
+        "name": "mild_acceleration",
+        "kind": "physical",
+        "accel_steer_head": [1.25, 0.0, 0.0]
+      },
+      {
+        "name": "mild_steering",
+        "kind": "physical",
+        "accel_steer_head": [0.0, 0.125, 0.0]
+      }
+    ]
+  },
+  "expected": {
+    "max_agent_slots": 64,
+    "controlled_slot": 0,
+    "controlled_agents": 1,
+    "discrete_actions": 91,
+    "observation_width": 2984,
+    "raw_info_width": 5,
+    "raw_info_order": [
+      "collided_with_road",
+      "collided_with_vehicle",
+      "collided_with_non_vehicle",
+      "reached_goal",
+      "agent_type"
+    ],
+    "physical_action_order": ["acceleration", "steering", "head_angle"]
+  },
+  "comparison": {
+    "rtol": 1e-6,
+    "atol": 1e-6,
+    "equal_nan": true,
+    "event_fields_require_exact_equality": true
+  },
+  "failure_definition": null,
+  "failure_definition_reason": "Milestone A records raw simulator signals only; the research failure predicate is intentionally not implemented."
+}

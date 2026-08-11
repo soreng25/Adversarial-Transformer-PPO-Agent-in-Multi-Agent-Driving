@@ -1,6 +1,6 @@
 # Project specification: adversarial Transformer-PPO for GPUDrive
 
-Status: **source-audited research draft; implementation is intentionally gated**
+Status: **source-audited research draft; Milestones A-C smoke tooling implemented with native certification pending; reported adversarial research remains gated**
 
 Prepared: 2026-08-10
 
@@ -21,7 +21,7 @@ The required stages are:
 7. replay distinct MCMC failure states and capture the final pre-failure Transformer latent; and
 8. cluster those latents and visualize them with their traces.
 
-This planning phase does not authorize the simulator wrapper, intervention, failure objective, training, or experiments. Those remain behind the research decisions in Section 8.
+The user authorized Milestone A, selected the existing published PPO and slot-0 SDC for Milestone B, and approved the explicit one-scene intervention, failure, eligibility, and adversary information definitions for Milestone C on 2026-08-11. The bounded Transformer-PPO training path is implemented as a non-claim smoke. Native eligibility/training has not run here, and the research cohort, reward calibration, seeds, and scale remain behind the decisions in Section 8.
 
 ## 2. Immutable provenance
 
@@ -77,7 +77,7 @@ This exact GPUDrive commit and both recursive submodule revisions are normative.
 
 ### 2.3 Non-scientific one-scene fixture
 
-Milestone A will use the scene already present in the pinned GPUDrive tree:
+Milestone A uses the scene already present in the pinned GPUDrive tree:
 
 | Field | Value |
 |---|---|
@@ -245,7 +245,7 @@ src/gpudrive_adversary/
   mcmc/                  conditional target, proposals, chain validation
   analysis/              distinct states, latent capture, clusters, plots
 tests/                   pure unit, native integration, GPU, and smoke tests
-third_party/gpudrive/    exact recursive source pin or equivalent vendoring
+.deps/gpudrive/          ignored recursive checkout verified from exact pins
 ```
 
 Any GPUDrive compatibility patch is explicit, fingerprinted, tested, and listed in manifests.
@@ -257,25 +257,25 @@ Any GPUDrive compatibility patch is explicit, fingerprinted, tested, and listed 
 | ID | Decision | Status |
 |---|---|---|
 | R0 | CartPole source URL and immutable revision | **Resolved:** commit `315b14a...`. |
-| R1 | Canonical GPUDrive victim checkpoint: pinned pretrained or repository-trained PPO | **Blocking before B.** |
-| R2 | Victim actor/cohort and non-victim behavior | **Blocking before B.** |
-| R3 | Intervention locus: victim actuation, observation, or another actor | **Blocking before C.** Source analogue favors victim actuation. |
-| R4 | Placement, dimensions, action order, and decision period | **Blocking before C.** Proposed 2-D decoded physical residual. |
-| R5 | Numerical disturbance bounds and final actuator envelope | **Blocking before C.** |
-| R6 | Nominal prior/measure, NLL or energy, temporal model, aggregation, and coefficient | **Blocking before C/F.** Source inconsistency requires an explicit choice. |
-| R7 | Victim failure predicate and simultaneous-event policy | **Blocking before C.** |
-| R8 | Nominal scene eligibility | **Blocking before B/C.** |
-| R9 | Collision response (`ignore`, `stop`, or `remove`) | **Blocking before C.** |
-| R10 | Dataset/split, scene selector, warm-up/start frame, and seeds | **Blocking before B.** |
+| R1 | Canonical GPUDrive victim checkpoint: pinned pretrained or repository-trained PPO | **Resolved:** published `policy_S10_000_02_27@1532950...`, verified safetensors SHA-256 `f3f26475...521b7`. |
+| R2 | Victim actor/cohort and non-victim behavior | **Resolved for the port:** dataset SDC in slot 0 with stable-ID assertions; all other dynamic actors use logged playback. |
+| R3 | Intervention locus: victim actuation, observation, or another actor | **Resolved for C smoke:** victim physical actuation residual. |
+| R4 | Placement, dimensions, action order, and decision period | **Resolved for C smoke:** post-decode 2-D acceleration/steering residual every step; no current victim action in adversary input. |
+| R5 | Numerical disturbance bounds and final actuator envelope | **Resolved for C smoke:** residual `[+/-0.667, +/-0.262]`; final acceleration `[-4,4]`, steering `[-3.142,3.142]`; head preserved. |
+| R6 | Nominal prior/measure, NLL or energy, temporal model, aggregation, and coefficient | **Resolved only for C smoke:** IID zero-mean tanh-Normal, latent sigma `[0.5,0.5]`, exact NLL excess, coefficient `0.01`. Fixed-plan MCMC/tail and research calibration remain blocking. |
+| R7 | Victim failure predicate and simultaneous-event policy | **Resolved for C smoke:** victim road/vehicle/nonvehicle contact; goal/horizon nonfailure; safety wins ties. |
+| R8 | Nominal scene eligibility | **Resolved rule:** require zero-disturbance clean goal success. Native eligibility of the pinned scene is still unassessed. |
+| R9 | Collision response (`ignore`, `stop`, or `remove`) | **Resolved for C smoke:** simulator `ignore` for victim compatibility; wrapper stops immediately on the first approved event. |
+| R10 | Dataset/split, scene selector, warm-up/start frame, and seeds | **Resolved only for smoke:** exact bundled scene and seed 42. A reported research cohort remains blocking. |
 | R11 | MCMC state and conditional target family | **Source-resolved state:** direct fixed-horizon plan. Its fixed-plan target density is conditioned on replay failure and declared separately; R6 decides whether it is identical to the PPO/baseline prior. |
 | R12 | Vector-valued MCMC proposal, bounds, adaptation, and retained-chain protocol | **Blocking before F.** Source default perturbs every coordinate with symmetric Gaussian noise and rejects out-of-box proposals. |
 | R13 | Distinct state and weighting semantics | **Source-resolved default:** row zero plus each accepted successor once; retain chain state IDs and dwell weights. |
 | R14 | Latent and forced-replay semantics | **Source-resolved default:** 64-D pre-action teacher-forced context feature at the failure-causing step. |
 | R15 | Primary clustering/visualization protocol | **Source-resolved default:** unweighted distinct states, StandardScaler, K-means/silhouette, PCA/t-SNE/UMAP, trace plots. |
-| R16 | GPUDrive adversary information set, tokenization, memory, masks, and frequency | **Blocking before C.** Source has a fixed 6-D vector and 50-step memory; driving requires an explicit adaptation. |
-| R17 | Failure reward/shaping and scale relative to the prior penalty | **Blocking before C.** Source uses `+1000` on failure and a terminal survival-margin penalty; those scales do not transfer automatically. |
+| R16 | GPUDrive adversary information set, tokenization, memory, masks, and frequency | **Resolved for C smoke:** current 2,984-D victim observation plus previous nominal command/effective disturbance, 50-step causal history, every simulator step. |
+| R17 | Failure reward/shaping and scale relative to the prior penalty | **Resolved only for non-claim smoke:** failure `+1`, NLL coefficient `0.01`, no horizon shaping. Research calibration remains blocking. |
 
-After the user explicitly approves these planning documents, Milestone A may begin as a pinned installation and simulator-semantics audit without first settling the attack definitions. No research wrapper begins until the user approves R1-R10 and R16-R17 as applicable. Milestone F additionally requires R11-R12 confirmation; Milestone G follows the source-resolved R13-R15 protocol unless a documented scientific deviation is approved.
+Milestones A-C are authorized as smoke-only repository paths. C may not be reported as research until native eligibility/replay, R10's cohort, and R6/R17's research calibration are settled. Milestone F additionally requires the fixed-plan R6 target/tail rule and R11-R12 confirmation; Milestone G follows the source-resolved R13-R15 protocol unless a documented scientific deviation is approved.
 
 ## 9. Definition of done
 

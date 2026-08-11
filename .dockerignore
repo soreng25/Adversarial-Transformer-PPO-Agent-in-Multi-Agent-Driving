@@ -1,0 +1,12 @@
+.git
+.deps
+.venv
+.pytest_cache
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+artifacts
+build
+gpudrive_cache
+.uv_cache
+.cache

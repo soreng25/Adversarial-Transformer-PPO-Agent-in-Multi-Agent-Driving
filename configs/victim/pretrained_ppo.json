@@ -1,0 +1,129 @@
+{
+  "schema": "gpudrive_victim_policy_pin",
+  "schema_version": 1,
+  "purpose": "deterministic_slot0_sdc_smoke_only",
+  "source": {
+    "repository": "daphne-cornelisse/policy_S10_000_02_27",
+    "revision": "1532950cad84dafc6e9d976a2bcc524ee481a1a1",
+    "revision_url": "https://huggingface.co/daphne-cornelisse/policy_S10_000_02_27/commit/1532950cad84dafc6e9d976a2bcc524ee481a1a1",
+    "files": {
+      "config.json": {
+        "required_at_runtime": true,
+        "size": 726,
+        "sha256": "e3f4cb2599f8b36aa8da4eb5c8fcb520a8e9b799ced35bfa6806fb80e0e98829"
+      },
+      "model.safetensors": {
+        "required_at_runtime": true,
+        "size": 206856,
+        "sha256": "f3f26475def35f375c6c72d8f8f20b2b091f77175010345dc3fa968a860521b7"
+      },
+      "README.md": {
+        "required_at_runtime": false,
+        "size": 346,
+        "sha256": "3a4c921848acd4cc9e81b745474f2f53fbf6572704c55304404fab0f1cb38ea2"
+      }
+    },
+    "license_status": "not_declared_in_pinned_model_card",
+    "redistribution": "download_and_verify; do_not_vendor_model_bytes"
+  },
+  "model_config": {
+    "act_func": "tanh",
+    "action_dim": 91,
+    "action_space_accel_disc": 7,
+    "action_space_steer_disc": 13,
+    "collision_behavior": "ignore",
+    "collision_weight": -0.75,
+    "dist_to_goal_threshold": 2.0,
+    "dropout": 0.0,
+    "dynamics_model": "classic",
+    "ego_state": true,
+    "goal_achieved_weight": 1.0,
+    "hidden_dim": 128,
+    "init_mode": "all_non_trivial",
+    "input_dim": 64,
+    "lidar_obs": false,
+    "max_controlled_agents": 64,
+    "norm_obs": true,
+    "obs_dim": 2984,
+    "obs_radius": 50.0,
+    "off_road_weight": -0.75,
+    "partner_obs": true,
+    "polyline_reduction_threshold": 0.1,
+    "remove_non_vehicles": true,
+    "reward_type": "weighted_combination",
+    "road_map_obs": true,
+    "sampling_seed": 42,
+    "vbd_in_obs": false
+  },
+  "safetensors_contract": {
+    "format": "safetensors",
+    "dtype": "F32",
+    "tensor_count": 24,
+    "parameter_count": 51228,
+    "state_dict_sha256": "75fc9f6f54636b32a560aaa9eb7f2464b586aa478f6ccab130b67a91d0e166bb",
+    "required_shapes": {
+      "actor.bias": [91],
+      "actor.weight": [91, 128],
+      "critic.bias": [1],
+      "critic.weight": [1, 128],
+      "ego_embed.0.bias": [64],
+      "ego_embed.0.weight": [64, 6],
+      "ego_embed.1.bias": [64],
+      "ego_embed.1.weight": [64],
+      "ego_embed.4.bias": [64],
+      "ego_embed.4.weight": [64, 64],
+      "partner_embed.0.bias": [64],
+      "partner_embed.0.weight": [64, 6],
+      "partner_embed.1.bias": [64],
+      "partner_embed.1.weight": [64],
+      "partner_embed.4.bias": [64],
+      "partner_embed.4.weight": [64, 64],
+      "road_map_embed.0.bias": [64],
+      "road_map_embed.0.weight": [64, 13],
+      "road_map_embed.1.bias": [64],
+      "road_map_embed.1.weight": [64],
+      "road_map_embed.4.bias": [64],
+      "road_map_embed.4.weight": [64, 64],
+      "shared_embed.0.bias": [128],
+      "shared_embed.0.weight": [128, 192]
+    }
+  },
+  "upstream_source_hashes": {
+    "gpudrive/networks/late_fusion.py": "50bbfe0eaca59a9b92159f169665232a15d4a707f1770c444eced38020d9e78d",
+    "examples/experimental/config/reliable_agents_params.yaml": "00aa914b161e95a1f82104a0a6e095bc659908f01b95ad67ebf20b9eae664cf7",
+    "gpudrive/env/config.py": "ac079f4d9ccab21dfc4dd4929672c87187a057783b971a62dd6b87234e3479b2",
+    "gpudrive/env/env_torch.py": "d1b99ec54ea58688539aaef35af21d868bd9805d4b3aa2912009e7351dbca537"
+  },
+  "environment": {
+    "num_worlds": 1,
+    "max_cont_agents": 1,
+    "model_agent_layout": 64,
+    "victim_slot": 0,
+    "background_behavior": "logged_trajectory_playback",
+    "scene_pin": "smoke_scene",
+    "action_type": "discrete",
+    "neutral_action_index": 45,
+    "acceleration_values": [-4.0, -2.667, -1.333, 0.0, 1.333, 2.667, 4.0],
+    "steering_values": [-3.142, -2.618, -2.094, -1.571, -1.047, -0.524, 0.0, 0.524, 1.047, 1.571, 2.094, 2.618, 3.142],
+    "head_angle_values": [0.0],
+    "action_table_float32_sha256": "f289195f4e447ee5b3423a8dfb0338cdaaa06819c51e1f24383258cd90ee8ac6",
+    "physical_action_order": ["acceleration", "steering", "head_angle"]
+  },
+  "evaluation": {
+    "deterministic_rule": "argmax_lowest_index",
+    "policy_mode": "eval_frozen_inference_mode",
+    "max_steps": 91,
+    "loader_seed": 42,
+    "comparison": {
+      "rtol": 1e-6,
+      "atol": 1e-6,
+      "equal_nan": true
+    }
+  },
+  "eligibility": {
+    "status": "not_assessed",
+    "reason": "Nominal-success eligibility and the research scene cohort are not approved yet."
+  },
+  "failure_definition": null,
+  "failure_definition_reason": "Milestone B records raw events and done signals but does not define research failure."
+}

@@ -23,7 +23,7 @@ The destination repository's bootstrap commit `597350b07b88de0281bf3c80774195537
 |---|---|---|---|---|
 | 1. Victim PPO | RLlib PPO; feed-forward ReLU MLP `[256,256,128]`; full 4-D or 100-D frame-stacked stateless input; deterministic evaluation with `explore=False`. | A victim is trained or loaded before attacks and remains a fixed experimental object. | Load a pinned GPUDrive PPO or train one from a pinned dataset; bind observation preprocessing and the action table to its checkpoint. | R1, R2, R10 |
 | 2. Freeze/evaluate | The restored victim algorithm is never trained by the adversary, although parameters are not explicitly frozen. A missing victim can silently become random inside the environment. | No victim sampling or learning during attack/evaluation. | `eval()`, `requires_grad_(False)`, inference mode, deterministic argmax, gradient/byte checks, and fail-closed loading. | R1, R2, R8 |
-| 3. Transformer-PPO adversary | One scalar wind residual is clipped and added to the same-step victim force. Six-value observation; one-unit 64-D RLlib GTrXL with 50-step memory; PPO reward includes Gaussian energy and failure incentives. | A causal sequential adversary applies bounded disturbances while paying a declared nominal-likelihood cost. | Closest analogue is a 2-D residual on decoded victim acceleration/steering. Driving observation/token design, units, bounds, prior, and reward require approval. | R3-R7, R9, R16, R17 |
+| 3. Transformer-PPO adversary | One scalar wind residual is clipped and added to the same-step victim force. Six-value observation; one-unit 64-D RLlib GTrXL with 50-step memory; PPO reward includes Gaussian energy and failure incentives. | A causal sequential adversary applies bounded disturbances while paying a declared nominal-likelihood cost. | The approved smoke uses a 2-D decoded victim acceleration/steering residual, a 2,989-D causal token, exact tanh-Normal accounting, and explicitly non-claim reward scales. | R3-R7, R9, R16, R17 |
 | 4. Trajectories | Normal adversary evaluation saves only NaN-padded winds, lengths, failure flags/steps, bound, sigma, and horizon. | Failure traces must be replayable and attributable. | Deliberately strengthen to complete scene-wide state/control/evidence traces plus immutable manifests. | Required schema below |
 | 5. Baselines | Positive constant sweep; IID Gaussian samples then clipped; a phase-zero sine sweep at a CartPole-specific frequency. Some reports use episode-length thresholds instead of true failure. | Compare learned attacks with simple deterministic/stochastic sequences under one budget and one event definition. | Use the shared adapter and true approved failure predicate. Do not inherit the threshold or frequency without justification. | R5-R10 |
 | 6. Failure-conditioned MCMC | Direct scalar plan of length 350; bounded Gaussian-energy target conditioned on deterministic replay failure; symmetric Gaussian random walk; every rejection repeats the current state. | Initialize inside failure support and never let the current chain leave it. Preserve dwell rows. | Use a fixed `[H,d]` physical-disturbance plan, exact replay, and a vector-valued source-matched or approved proposal. | R6, R7, R11, R12 |
@@ -38,9 +38,9 @@ There is exactly one controlled cart/pole victim. It chooses `Discrete(2)`: acti
 
 The normal victim receives `[x, x_dot, theta, theta_dot]`. The optional "stateless" victim receives a 50-frame stack of `[x, theta]`, so its feed-forward input is 100-D. The Transformer adversary, not the victim, is the sequential policy in the main attack pipeline.
 
-### GPUDrive definition requiring approval (R1/R2)
+### Approved GPUDrive definition (R1/R2)
 
-**Proposed:** one valid Waymo self-driving-car (SDC) vehicle is the victim for each eligible scene. It is identified by `scenario_id` plus stable object ID, never only by tensor slot. On every reset the adapter must assert:
+The user selected the pinned published GPUDrive PPO and one valid Waymo self-driving-car (SDC) vehicle as victim. It is identified by `scenario_id` plus stable object ID, never only by tensor slot. On every reset the adapter must assert:
 
 1. exactly one victim is selected;
 2. its controlled mask is true;
@@ -50,9 +50,9 @@ The normal victim receives `[x, x_dot, theta, theta_dot]`. The optional "statele
 
 Scenes that fail these assertions are excluded with a recorded reason. For the first port, the proposed non-victim behavior is GPUDrive's logged trajectory playback. This is deterministic but non-reactive and changes the causal interpretation of collisions.
 
-Alternatives that must be chosen explicitly are a track-to-predict vehicle, a preregistered ordinary-vehicle selector, all eligible controlled vehicles as separate samples, or reactive policy-controlled background actors. The pinned GPUDrive `womd_tracks_to_predict` selector must not be trusted without a focused fix/test because its current predicate can make non-track agents eligible.
+Not-selected alternatives include a track-to-predict vehicle, a preregistered ordinary-vehicle selector, all eligible controlled vehicles as separate samples, or reactive policy-controlled background actors. Any later switch is a new scientific decision. The pinned GPUDrive `womd_tracks_to_predict` selector must not be trusted without a focused fix/test because its current predicate can make non-track agents eligible.
 
-The leading load candidate is the published GPUDrive PPO snapshot `daphne-cornelisse/policy_S10_000_02_27`, pinned at revision `1532950cad84dafc6e9d976a2bcc524ee481a1a1`; observed `model.safetensors` SHA-256: `f3f26475def35f375c6c72d8f8f20b2b091f77175010345dc3fa968a860521b7`. A repository-trained PPO is also valid, but one path must be declared canonical for reported results.
+The canonical checkpoint is `daphne-cornelisse/policy_S10_000_02_27`, pinned at revision `1532950cad84dafc6e9d976a2bcc524ee481a1a1`; `model.safetensors` SHA-256: `f3f26475def35f375c6c72d8f8f20b2b091f77175010345dc3fa968a860521b7`. The current fixture binds its sole controlled actor to internal slot 0 and stable object ID 271; logged playback supplies every background actor. R8/R10 still govern which scenes may enter reported research.
 
 ## 4. Adversary-controlled variable and dimensions
 
@@ -74,7 +74,7 @@ force_t = 10 * victim_sign_t + clip(w_t, -max_wind, max_wind)
 
 Thus the threat model is an additive physical actuation residual, not an action-index, logit, observation, or second-agent attack.
 
-### GPUDrive definition requiring approval (R3/R4/R16)
+### Approved GPUDrive smoke definition (R3/R4/R16)
 
 Scientifically different choices are:
 
@@ -83,7 +83,7 @@ Scientifically different choices are:
 3. direct control of another traffic actor; or
 4. manipulation of scene/initial conditions.
 
-**Proposed source analogue:** a 2-D victim-control residual
+**Approved smoke source analogue:** a 2-D victim-control residual
 
 ```text
 d_t = [delta_acceleration_t, delta_steering_t] in R^2
@@ -104,7 +104,7 @@ The computation may be scheduled in either order, but the adversary information 
 
 The canonical simulator order is `[acceleration, steering, head_angle]`. The pinned GPUDrive continuous-space helper exposes acceleration/steering in a conflicting order from the simulator consumer, so the port will use named fields and a raw-tensor action-order test. The adversary does not modify head angle under this proposal; it preserves the victim's decoded value. For the candidate 91-way classic action table, that value is separately expected and asserted to be zero.
 
-The source acts every CartPole transition (`0.02 s`). GPUDrive's default step is `0.1 s`; whether the adversary acts every simulator step or holds commands over several steps is part of R4/R16 and cannot be inferred from CartPole time units.
+The source acts every CartPole transition (`0.02 s`). GPUDrive's default step is `0.1 s`; the approved smoke adversary acts every simulator step. This is recorded as a driving-domain adaptation, not inferred by equating the physical time units.
 
 ## 5. Disturbance bounds, prior, and penalty
 
@@ -126,7 +126,7 @@ energy(w_t) = 0.5 * (w_t / sigma)^2
 
 The source therefore does not implement one identical probability measure across training, the stochastic baseline, and MCMC. It also accumulates adversary penalties only until termination, while MCMC scores the full fixed horizon, including a tail never applied after failure.
 
-### GPUDrive definition requiring approval (R5/R6)
+### Approved C-smoke definition and later R6 gate (R5/R6)
 
 For the proposed 2-D intervention, define
 
@@ -134,11 +134,11 @@ For the proposed 2-D intervention, define
 B = [-b_accel, b_accel] x [-b_steer, b_steer]
 ```
 
-plus a final physical actuator envelope. No numerical values are chosen here. Acceleration and steering have different units and effects; the upstream 91-action grid endpoints are not automatically a defensible attack budget, especially because classic steering enters a tangent.
+The approved smoke uses `b_accel=0.667`, `b_steer=0.262`, then clips the final physical acceleration to `[-4,4]` and steering to `[-3.142,3.142]`, with head angle preserved. These are explicit smoke values rather than a claim that upstream grid endpoints define a general attack budget.
 
-The user must approve numerical values or a preregistered calibration from a pinned nominal-control cohort. The calibration output is then frozen before failure measurement.
+For C only, the declared prior is an IID zero-mean tanh-squashed Normal with latent standard deviations `[0.5,0.5]`, exact change-of-variables density, and a per-step `0.01 * NLL_excess_from_zero` penalty. The failure bonus is `1`. Those scales are labeled non-claim plumbing values.
 
-R6 must select one of these explicitly:
+Before baselines/MCMC or research-scale training, R6 must still settle cross-stage mechanics explicitly:
 
 - **Source-compatible mechanics:** use the Gaussian energy on bounded actions for PPO, a clipped-Gaussian stochastic baseline, and the continuous bounded-Gaussian density for MCMC; document that these are different measures.
 - **Coherent bounded-prior adaptation (recommended):** use the same properly normalized componentwise truncated Gaussian for PPO prior accounting, the stochastic baseline, and the fixed-plan MCMC target. This preserves the Gaussian-likelihood idea while removing boundary atoms and cross-stage ambiguity.
@@ -159,11 +159,11 @@ OR abs(pole_angle) > 12 degrees
 
 Exact equality is not failure. Failure is `terminated=True`. Reaching the horizon (default 500) without a crossing is `truncated=True` and not failure. If crossing occurs on the horizon transition, failure wins. Source `failure_step` and `episode_len` are one-based transition counts, so the causing wind is at index `failure_step - 1`.
 
-### GPUDrive definition requiring approval (R7/R8/R9)
+### Approved GPUDrive smoke definition (R7/R8/R9)
 
 GPUDrive exposes victim post-step channels corresponding to road-object contact, vehicle collision, non-vehicle collision, and goal reached. Its Python `off_road` name refers to the road-collision channel and is not evidence of a general geometric lane-departure predicate. `done` also includes goal/horizon and cannot define failure.
 
-**Proposed source analogue:** victim-only safety failure on the first post-action transition with any of:
+**Approved smoke source analogue:** victim-only safety failure on the first post-action transition with any of:
 
 ```text
 collidedWithVehicle
@@ -173,9 +173,14 @@ OR collidedWithRoad
 
 Goal and horizon remain non-failure termination reasons. Simultaneous flags are stored losslessly and safety failure wins only for the derived outcome. Under the leading pretrained victim configuration, keep `collision_behavior=ignore`, inspect transient collision flags immediately after every step, and have the research wrapper terminate at the first approved event.
 
-Alternatives requiring approval include excluding road contact, defining geometric lane departure, including timeout/non-goal, counting any-agent events, or using `stop`/`remove` collision behavior.
+The pinned victim-compatible environment also has `remove_non_vehicles=true`.
+The classifier retains the raw nonvehicle channel for a stable definition, but
+that subtype is likely unreachable in the bundled smoke scene; observing none
+does not establish safety against nonvehicles.
 
-**Proposed eligibility strengthening:** attack only scene/victim pairs whose zero-disturbance rollout reaches the goal without the approved safety event. The CartPole source does not impose this condition, so adopting it changes the estimand but avoids labeling an already-failing nominal rollout as adversarially induced.
+Any later change such as excluding road contact, defining geometric lane departure, including timeout/non-goal, counting any-agent events, or using `stop`/`remove` is a new scientific definition and requires approval.
+
+**Approved eligibility strengthening:** attack only scene/victim pairs whose zero-disturbance rollout reaches the goal without the approved safety event. The CartPole source does not impose this condition, so adopting it changes the estimand but avoids labeling an already-failing nominal rollout as adversarially induced. The bundled scene has not yet passed this native preflight.
 
 Canonical port indexing is:
 
@@ -391,28 +396,28 @@ PCA/t-SNE/UMAP visualize the full-space K-means labels; they do not define the c
 
 Recommended answers are proposals, not decisions already made.
 
-| ID | Scientific decision | Source evidence | Proposed GPUDrive answer | Status |
+| ID | Scientific decision | Source evidence | Current GPUDrive answer | Status |
 |---|---|---|---|---|
 | R0 | Methodology source/revision | Exact code now audited. | Commit `315b14a...`. | Resolved |
-| R1 | Canonical victim | Source trains/loads one PPO. | Pinned published 10k-scene PPO first; separately support training. | Blocking |
-| R2 | Victim/cohort/background | One victim; no background. | One valid SDC; other actors logged playback. | Blocking |
-| R3 | Intervention locus | Additive victim physical-force residual. | Victim physical-control residual. | Blocking |
-| R4 | Placement/dimensions/period | One same-step scalar, no current victim action in adversary input. | 2-D decoded `[delta_accel, delta_steer]`, every GPUDrive step, excluding current nominal action from adversary input. | Blocking |
-| R5 | Bounds/actuator envelope | Symmetric scalar bound; experiment uses 1 despite CLI default 4. | User-specified physical values or preregistered nominal-control calibration. | Blocking |
-| R6 | Prior/NLL/plan accounting | Gaussian energy, clipped random baseline, bounded continuous MCMC, full-H MCMC score. | Recommended coherent IID componentwise truncated Gaussian; exact scale/coefficient/tail rule required. | Blocking |
-| R7 | Failure | Strict post-step physical threshold; horizon nonfailure. | Victim vehicle/non-vehicle/road-contact union; goal/horizon nonfailure. | Blocking |
-| R8 | Eligibility | Source attacks all evaluated seeds. | Require nominal safety-clean goal success before attack. | Blocking (intentional strengthening) |
-| R9 | Collision response | Failure immediately terminates. | Keep simulator `ignore` for checkpoint compatibility, but wrapper stops immediately on approved event. | Blocking |
-| R10 | Dataset/start | Synthetic reset distribution. | Pin corpus/split/cohort, preprocessing, warm-up/start frame, and scene seeds. | Blocking |
+| R1 | Canonical victim | Source trains/loads one PPO. | Pinned published PPO revision `1532950...`; strict safetensors load. | Resolved |
+| R2 | Victim/cohort/background | One victim; no background. | Slot-0 SDC with stable identity; other actors logged playback. | Resolved |
+| R3 | Intervention locus | Additive victim physical-force residual. | Victim physical-control residual. | Resolved for C smoke |
+| R4 | Placement/dimensions/period | One same-step scalar, no current victim action in adversary input. | 2-D decoded `[delta_accel, delta_steer]`, every GPUDrive step, excluding current nominal action from adversary input. | Resolved for C smoke |
+| R5 | Bounds/actuator envelope | Symmetric scalar bound; experiment uses 1 despite CLI default 4. | Residual `[+/-0.667, +/-0.262]`; final acceleration `[-4,4]`, steering `[-3.142,3.142]`, head preserved. | Resolved for C smoke |
+| R6 | Prior/NLL/plan accounting | Gaussian energy, clipped random baseline, bounded continuous MCMC, full-H MCMC score. | C smoke: IID zero-mean tanh-Normal, latent sigma `[0.5,0.5]`, exact NLL excess, coefficient `0.01`. | C smoke resolved; research/F target and tail blocking |
+| R7 | Failure | Strict post-step physical threshold; horizon nonfailure. | Victim vehicle/non-vehicle/road-contact union; goal/horizon nonfailure; safety wins ties. | Resolved for C smoke |
+| R8 | Eligibility | Source attacks all evaluated seeds. | Require nominal safety-clean goal success before attack. | Resolved rule; native scene result pending |
+| R9 | Collision response | Failure immediately terminates. | Keep simulator `ignore` for checkpoint compatibility, but wrapper stops immediately on approved event. | Resolved for C smoke |
+| R10 | Dataset/start | Synthetic reset distribution. | Exact bundled scene/seed for smoke; pin a larger eligible cohort for reported research. | Smoke resolved; research blocking |
 | R11 | MCMC state/target | Direct fixed-H disturbance plan under a separately parameterized bounded Gaussian density conditioned on failure. | Same state family in 2-D; R6 decides whether its target density equals the PPO/baseline prior. | Source-resolved state; confirm target in R6 |
 | R12 | Proposal | Symmetric Gaussian `all` default; `single`/`block` supported; out-of-box rejection. | Source-matched `all` or approved block adaptation; freeze scale after burn-in. | Blocking before F |
 | R13 | Distinct/weighting | Row zero plus accepted successors; dwell weights retained; analysis unweighted. | Preserve exactly and record content revisits. | Source-resolved |
 | R14 | Latent | Finite 64-D private `_features` copied before the forced failure action; exact wrapper layer semantics require verification. | Stable, model-tested 64-D `pre_actor_features`, teacher-forced context label. | Source-resolved timing; engineering verification required |
 | R15 | Analysis | StandardScaler, K-means/silhouette, PCA/t-SNE/UMAP, unweighted traces. | Preserve as primary; add manifested driving views. | Source-resolved |
-| R16 | Information/token/history/frequency | Six-vector plus previous action sign/wind; 50-step memory. | Approve victim-centric driving fields/tokens/masks, previous nominal/applied control/disturbance, 50-step context, and decision period. | Blocking |
-| R17 | Failure reward | `-0.5(w/sigma)^2`, `+1000` failure, and subtraction of remaining normalized boundary margin only on nonfailure horizon, with gamma 0.99. | Approve sparse/dense driving risk objective and scale relative to prior penalty; do not copy 1000 numerically without calibration. | Blocking |
+| R16 | Information/token/history/frequency | Six-vector plus previous action sign/wind; 50-step memory. | Current 2,984-D victim observation plus previous 3-D nominal command and 2-D effective disturbance; causal 50-step history; every simulator step. | Resolved for C smoke |
+| R17 | Failure reward | `-0.5(w/sigma)^2`, `+1000` failure, and subtraction of remaining normalized boundary margin only on nonfailure horizon, with gamma 0.99. | C smoke: failure `+1`, NLL coefficient `0.01`, no horizon shaping. | C smoke resolved; research calibration blocking |
 
-No adversary environment, failure writer, or research training should be implemented until R1-R10 and R16-R17 are recorded. R11-R12 are additionally required for MCMC. Source-resolved R13-R15 will be used unless the user approves a named deviation.
+The approved C implementation is a one-scene non-claim smoke. It cannot be promoted to reported research until the native eligibility result, R10 cohort, and R6/R17 research calibration are recorded. R11-R12 plus the fixed-plan R6 tail/target rule are additionally required for MCMC. Source-resolved R13-R15 will be used unless the user approves a named deviation.
 
 ## 15. Evidence anchors
 

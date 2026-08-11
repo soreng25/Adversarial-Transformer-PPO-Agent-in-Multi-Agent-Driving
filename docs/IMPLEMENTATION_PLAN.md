@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: **source audit complete; implementation not started**
+Status: **Milestones A-C repository tooling implemented; native runtime certification pending; Milestones D-G not started**
 
 Methodology source: `soreng25/Adversarial-Transformer-PPO-agent-in-Cartpole@315b14a90b252ba416eb329e8003d5926806ba67`
 
@@ -8,9 +8,9 @@ GPUDrive: `Emerge-Lab/gpudrive@aa48a431ed127a37610cc2176db30ec73d0c55df`
 
 ## 1. Entry gate and dependency order
 
-The requested CartPole source is now pinned and inspected, so R0 is closed. This plan still does not authorize implementation by itself. After the user approves these documents, they may authorize Milestone A alone before settling the intervention/failure choices, because A is restricted to installation and simulator-semantics evidence. The research wrapper and Milestones B-G remain gated as described below.
+The requested CartPole source is pinned and inspected, so R0 is closed. The user authorized Milestone A, selected the pinned published PPO and slot-0 SDC for Milestone B, and approved the smoke intervention/failure/information definitions for Milestone C on 2026-08-11. The A-C repository paths, validators, tests, and documentation are implemented. Native build, victim rollout, and tiny adversary-training certificates remain pending on a supported Linux/CUDA host. Milestones D-G remain gated as described below.
 
-Milestone A is limited to reproducible installation and read-only simulator-semantics validation. It may not introduce the attack or failure objective. Before Milestone B, approve R1, R2, R8, and R10. Before Milestones C-E, also approve R3-R7, R9, R16, and R17. Before F, confirm R6, R11, and R12. G uses the source-backed R13-R15 defaults unless a deliberate deviation is recorded.
+Milestone A is limited to reproducible installation and read-only simulator-semantics validation. R1-R5, R7-R9, and R16 are resolved for the one-scene smoke. R6 and R17 are resolved only to explicitly labeled non-claim smoke values. R10, research reward calibration, full-training scale, and the eligible research cohort remain open. Before F, confirm the fixed-plan R6 target/tail rule and R11-R12. G uses the source-backed R13-R15 defaults unless a deliberate deviation is recorded.
 
 ```text
 explicit approval of planning documents
@@ -64,7 +64,7 @@ These choices do not settle the research questions:
 
 - Python package: `gpudrive_adversary` in a `src/` layout.
 - CLI: a `gda` entry point with subcommands and resolved configuration output.
-- Configuration: versioned YAML input parsed into typed objects, then canonical JSON for hashing.
+- Configuration: versioned JSON for Milestone A, with typed validation and canonical JSON hashing; later research configs may add YAML only with the same canonicalization boundary.
 - Artifacts: one directory per artifact, `manifest.json`, typed non-pickled arrays/tensors, and atomic publication.
 - Fingerprints: SHA-256 over raw files and canonical sorted manifests.
 - Tests: `pytest` markers `unit`, `gpudrive`, `gpu`, `smoke`, and `slow`.
@@ -83,6 +83,8 @@ docs/
   PROJECT_SPEC.md
   CARTPOLE_TO_GPUDRIVE_MAP.md
   IMPLEMENTATION_PLAN.md
+  MILESTONE_A.md
+  MILESTONE_A_VALIDATION.md
   RESEARCH_DECISIONS.md
   SMOKE_PIPELINE.md
 src/gpudrive_adversary/
@@ -99,7 +101,7 @@ tests/
   unit/
   integration/
   smoke/
-third_party/gpudrive/
+.deps/gpudrive/        ignored, recursively fetched from immutable pins
 ```
 
 ## 4. Cross-cutting implementation rules
@@ -146,7 +148,7 @@ Build and identify the exact simulator, step one immutable scene, establish acti
 
 ### Work
 
-1. Add GPUDrive at `aa48a431ed127a37610cc2176db30ec73d0c55df` recursively with:
+1. Pin and recursively fetch GPUDrive at `aa48a431ed127a37610cc2176db30ec73d0c55df` with:
    - `external/madrona@4bda33465340fabc2e61fb27f95aa04795a15466`;
    - `external/json@0457de21cffb298c22b629e538036bfeb96130b7`.
 2. Create a Linux x86-64 reference container using Python 3.11 and CUDA 12.4. Resolve `nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04` to an image digest and record compiler, CMake, driver compatibility, GPU, extension hash, and Madrona kernel-cache identity.
@@ -155,7 +157,7 @@ Build and identify the exact simulator, step one immutable scene, establish acti
 5. Add a one-world smoke for scene `data/processed/examples/tfrecord-00000-of-01000_325.json`, scenario `ef3a8f65142f41ac`, stable SDC ID 271, scene SHA-256 `69bd2b9ae49d43745651262abf3956309e9c0092ca24aff72e0f9abb32f9b948`.
 6. Step several safe named physical commands and read observations, state, reward, done, and raw info.
 7. Prove raw action order `[acceleration, steering, head_angle]` with a focused dynamics test.
-8. Audit vehicle, non-vehicle, road-contact, goal, and horizon signals, including immediate collision-flag lifetime under `collision_behavior=ignore`.
+8. Source-audit vehicle, non-vehicle, road-contact, goal, horizon, and immediate collision-flag lifetime under `collision_behavior=ignore`; in runtime traces, capture raw info immediately after every step and verify its high-level mapping. This stage does not manufacture a collision or elevate any channel into a research failure predicate.
 9. Compare fixed-action repeated resets and fresh processes on CPU and CUDA. Store event/timestep equality and numeric drift; do not claim cross-device bitwise identity.
 
 ### Deliverables and exit criteria
@@ -168,6 +170,13 @@ Build and identify the exact simulator, step one immutable scene, establish acti
 - No victim/adversary training and no provisional attack/failure wrapper are introduced.
 
 ## 6. Milestone B - deterministic victim evaluation
+
+Implementation status: the immutable checkpoint acquisition/verification,
+slot-0 SDC binding, frozen argmax adapter, checkpoint-compatible environment,
+typed nominal trace, same-process replay, fresh-process comparison, and
+artifact validator are implemented. Native execution, the approved R8
+eligibility result, and the R10 research cohort remain pending; the current
+scene is explicitly smoke-only.
 
 ### Goal
 
@@ -194,6 +203,13 @@ Create one immutable GPUDrive victim with reproducible preprocessing, actor sele
 - Every output contains the common fingerprint bundle.
 
 ## 7. Milestone C - adversary environment and Transformer-PPO
+
+Implementation status: the approved one-scene, non-claim smoke contract,
+bounded intervention/prior, failure/eligibility evaluator, causal environment,
+Transformer-PPO update, safe checkpoint/run validators, deterministic
+post-update evaluation, CLI, and Linux/CUDA runner are implemented. Native
+execution is pending; the pinned scene's clean-goal eligibility is not yet
+known. Research-scale cohort/reward/training choices remain open.
 
 ### Goal
 
@@ -366,13 +382,13 @@ One scene, a few environment steps, a very small batch, and one or two PPO updat
 
 ## 13. Documented tiny end-to-end pipeline
 
-Milestone A will turn this outline into tested commands in `docs/SMOKE_PIPELINE.md`:
+Milestones A-C now provide the first executable part of this pipeline; D-G
+commands remain planned:
 
 ```bash
-gda doctor --strict
-gda scene-smoke --config configs/smoke/scene.yaml
-gda victim evaluate --config configs/smoke/victim.yaml
-gda adversary train --config configs/smoke/adversary.yaml
+scripts/bootstrap_linux.sh cuda
+scripts/run_victim_reference.sh cuda
+scripts/run_adversary_reference.sh
 gda replay verify --artifact artifacts/smoke/failure
 gda baselines run --config configs/smoke/baselines.yaml
 gda mcmc run --config configs/smoke/mcmc.yaml --init artifacts/smoke/failure
@@ -388,18 +404,14 @@ The smoke ends with one complete runtime/scene/victim manifest, a frozen nominal
 
 The minimum decision record is:
 
-1. R1/R2: canonical victim checkpoint, one SDC or another actor selector, and logged versus reactive background.
-2. R3/R4: approve victim actuation residual and its 2-D `[delta_accel, delta_steer]` placement/decision period, or choose another threat model.
-3. R5: numeric residual bounds and final actuator envelope, or an approved calibration protocol.
-4. R6: source-compatible mixed probability mechanics or one coherent bounded prior; dimension scales, penalty formula/coefficient, and post-failure-tail accounting.
-5. R7/R9: exact victim failure bit set and collision behavior.
-6. R8: whether attacks are conditioned on nominal safety-clean goal success.
-7. R10: experiment dataset/split/cohort, preprocessing revision, and warm-up/start frame.
-8. R16: exact adversary driving fields/tokens/masks, previous control/disturbance history, context length, and decision frequency.
-9. R17: failure bonus/shaping and scale relative to the prior penalty.
-10. R12: source-default all-coordinate MCMC or a block/single-coordinate adaptation, scale/adaptation, horizon, and retained-chain settings.
+1. R1/R2 are resolved: pinned published PPO, slot-0 SDC, and logged background playback.
+2. R3-R5, R7-R9, and R16 are resolved for the smoke contract documented in `MILESTONE_C.md`.
+3. R6/R17 are resolved only for the non-claim smoke: zero-mean tanh-Normal prior, latent sigma `[0.5,0.5]`, exact NLL excess, failure bonus `1`, coefficient `0.01`, and no shaping.
+4. R10: choose the research dataset/split/eligible cohort, preprocessing revision, and warm-up/start frame.
+5. R6/R17 research scale: calibrate prior scales, reward coefficient/shaping, seed count, and transition budget; separately settle fixed-H post-failure-tail accounting for F.
+6. R12: choose the source-default all-coordinate MCMC or a block/single-coordinate adaptation, scale/adaptation, horizon, and retained-chain settings.
 
-R11, R13, R14, and R15 now have source-backed defaults. They need no reinvention, but any requested deviation will be recorded as a scientific choice. Until the blocking answers above are approved, the correct state is planning complete and implementation not started.
+R11, R13, R14, and R15 have source-backed defaults. They need no reinvention, but any requested deviation will be recorded as a scientific choice. The A-C native certificates and the research cohort/calibration remain pending; implementation can proceed next to the schema/replay work in D without presenting the smoke as a research result.
 
 ## 15. Milestone review checklist
 

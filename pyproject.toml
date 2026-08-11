@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools==75.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpudrive-adversary"
+version = "0.1.0"
+description = "Replayable adversarial failure discovery for pinned GPUDrive"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy==1.26.4",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.3.5",
+]
+
+[project.scripts]
+gda = "gpudrive_adversary.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+    "unit: tests that need neither GPUDrive nor a training job",
+    "gpudrive: tests that require the pinned native GPUDrive build",
+    "gpu: tests that require the reference CUDA runtime",
+    "smoke: small end-to-end plumbing checks",
+    "slow: tests excluded from the default developer loop",
+]
+
