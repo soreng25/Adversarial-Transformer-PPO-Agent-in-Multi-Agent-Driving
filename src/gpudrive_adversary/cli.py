@@ -19,6 +19,10 @@ from .adversary.training_artifact import (
     validate_adversary_training_artifact,
 )
 from .doctor import build_doctor_report
+from .multiagent.artifact import validate_multiagent_training_artifact
+from .multiagent.environment import MultiAgentEnvironmentError
+from .multiagent.scene import MultiAgentSceneError
+from .multiagent.training import MultiAgentTrainingError, train_highway_multiagent
 from .pins import (
     PinError,
     load_pins,
@@ -191,6 +195,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     adversary_run_validate.add_argument("artifact", type=Path)
     adversary_run_validate.add_argument("--output", type=Path)
+
+    highway_train = subparsers.add_parser(
+        "highway-train",
+        help="Train the focal-car adversary against ten frozen PPO vehicles.",
+    )
+    _add_pin_and_source(highway_train)
+    highway_train.add_argument("--victim-pin", type=Path)
+    highway_train.add_argument("--victim-checkpoint", type=Path)
+    highway_train.add_argument("--adversary-config", type=Path)
+    highway_train.add_argument("--experiment-config", type=Path)
+    highway_train.add_argument(
+        "--scene-source",
+        type=Path,
+        help="Pinned original GPUDrive-mini JSON (default: .deps/datasets/GPUDrive_mini/<configured path>).",
+    )
+    highway_train.add_argument("--output", type=Path, required=True)
+
+    highway_validate = subparsers.add_parser(
+        "validate-highway-run",
+        help="Validate a ten-PPO-agent highway training artifact.",
+    )
+    highway_validate.add_argument("artifact", type=Path)
+    highway_validate.add_argument("--output", type=Path)
     return parser
 
 
@@ -364,12 +391,34 @@ def main(argv: list[str] | None = None) -> int:
             report = validate_adversary_training_artifact(args.artifact)
             _write_or_print(report, args.output)
             return 0 if report["ok"] else 1
+
+        if args.command == "highway-train":
+            manifest = train_highway_multiagent(
+                source=args.source,
+                output=args.output,
+                checkpoint_directory=args.victim_checkpoint,
+                scene_source=args.scene_source,
+                adversary_config_path=args.adversary_config,
+                experiment_config_path=args.experiment_config,
+                victim_pin_path=args.victim_pin,
+                gpudrive_pin_path=args.pins,
+            )
+            print(json.dumps({"ok": True, "artifact": str(args.output.resolve()), "artifact_id": manifest["artifact_id"], "clean_eligibility": manifest["clean_eligibility"], "final_metrics": manifest["metrics"][-1]}, indent=2, sort_keys=True))
+            return 0
+
+        if args.command == "validate-highway-run":
+            report = validate_multiagent_training_artifact(args.artifact)
+            _write_or_print(report, args.output)
+            return 0 if report["ok"] else 1
     except (
         AdversaryCheckpointError,
         AdversaryConfigError,
         AdversaryTrainingArtifactError,
         AdversaryTrainingError,
         PinError,
+        MultiAgentEnvironmentError,
+        MultiAgentSceneError,
+        MultiAgentTrainingError,
         SmokeError,
         VictimCheckpointError,
         VictimEvaluationError,

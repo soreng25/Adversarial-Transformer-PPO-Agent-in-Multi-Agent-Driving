@@ -14,7 +14,7 @@ The machine-readable source of truth is [`configs/runtime/gpudrive-pins.json`](.
 | GPUDrive Git tree | `33240941cc9e2504f2cbc9f61f7169b2a7d5ac25` |
 | Madrona submodule | `4bda33465340fabc2e61fb27f95aa04795a15466` |
 | nlohmann/json submodule | `0457de21cffb298c22b629e538036bfeb96130b7` |
-| Upstream `uv.lock` SHA-256 | `d4f6fe3df752ae9f5cf4fd3e8c510870273fefc4e3c0f3df401f16a62ef7a04d` |
+| Upstream `uv.lock` SHA-256 | `bd0af4c8fda0c7932f9296f22ab1df3c52cbe92320884b0ea1aa994ab6fc28a2` |
 | Reference Python | `3.11.9` |
 | Reference CUDA | `12.4` |
 | Linux/amd64 CUDA image manifest | `sha256:0a1cb6e7bd047a1067efe14efdf0276352d5ca643dfd77963dab1a4f05a003a4` |

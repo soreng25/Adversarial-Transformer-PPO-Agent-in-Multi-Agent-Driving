@@ -6,7 +6,7 @@
     "commit": "aa48a431ed127a37610cc2176db30ec73d0c55df",
     "tree": "33240941cc9e2504f2cbc9f61f7169b2a7d5ac25",
     "package_version": "0.4.0",
-    "uv_lock_sha256": "d4f6fe3df752ae9f5cf4fd3e8c510870273fefc4e3c0f3df401f16a62ef7a04d",
+    "uv_lock_sha256": "bd0af4c8fda0c7932f9296f22ab1df3c52cbe92320884b0ea1aa994ab6fc28a2",
     "submodules": {
       "external/json": "0457de21cffb298c22b629e538036bfeb96130b7",
       "external/madrona": "4bda33465340fabc2e61fb27f95aa04795a15466"

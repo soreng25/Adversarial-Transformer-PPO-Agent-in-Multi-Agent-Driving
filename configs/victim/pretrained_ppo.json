@@ -89,10 +89,10 @@
     }
   },
   "upstream_source_hashes": {
-    "gpudrive/networks/late_fusion.py": "50bbfe0eaca59a9b92159f169665232a15d4a707f1770c444eced38020d9e78d",
-    "examples/experimental/config/reliable_agents_params.yaml": "00aa914b161e95a1f82104a0a6e095bc659908f01b95ad67ebf20b9eae664cf7",
-    "gpudrive/env/config.py": "ac079f4d9ccab21dfc4dd4929672c87187a057783b971a62dd6b87234e3479b2",
-    "gpudrive/env/env_torch.py": "d1b99ec54ea58688539aaef35af21d868bd9805d4b3aa2912009e7351dbca537"
+    "gpudrive/networks/late_fusion.py": "966b28da3fe1c8659a8e2c00a1567233ff190b2dd4578d6fcb8734b80dc3af3e",
+    "examples/experimental/config/reliable_agents_params.yaml": "88d6d7ad197ab17949cb9110d1aab22ecddbded4f12600a19a4e908e998ceccd",
+    "gpudrive/env/config.py": "826ac0327f35bc0b5d258f2262da097fa28694cc1101ceb8c3628af6002022b5",
+    "gpudrive/env/env_torch.py": "f50e14f5ea957bbf101a485252597124034d69a29e87dfa56995a7e3d6a77179"
   },
   "environment": {
     "num_worlds": 1,

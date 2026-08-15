@@ -69,6 +69,44 @@ def validate_slot0_binding(
     return {"world": 0, "slot": 0, "stable_id": expected_id, "is_sdc": True}
 
 
+def validate_multiagent_binding(
+    controlled_mask: np.ndarray,
+    is_sdc: np.ndarray,
+    stable_ids: np.ndarray,
+    *,
+    expected_ids: list[int] | tuple[int, ...],
+) -> dict[str, Any]:
+    """Require one world whose first N slots are the exact controlled IDs."""
+
+    controlled = np.asarray(controlled_mask, dtype=bool)
+    sdc = np.asarray(is_sdc)
+    ids = np.asarray(stable_ids)
+    expected = np.asarray(expected_ids, dtype=np.int64)
+    if controlled.shape != sdc.shape or controlled.shape != ids.shape:
+        raise VictimCheckpointError("control, SDC, and ID arrays must have equal shape")
+    if controlled.ndim != 2 or controlled.shape[0] != 1:
+        raise VictimCheckpointError("multi-agent binding requires exactly one world")
+    if expected.ndim != 1 or expected.size < 2 or len(set(expected.tolist())) != expected.size:
+        raise VictimCheckpointError("expected controlled IDs must be unique")
+    desired = np.zeros_like(controlled)
+    desired[0, : expected.size] = True
+    if not np.array_equal(controlled, desired):
+        raise VictimCheckpointError("controlled mask is not exactly the expected leading slots")
+    observed = ids[0, : expected.size].astype(np.int64)
+    if not np.array_equal(observed, expected):
+        raise VictimCheckpointError(
+            f"controlled stable IDs are {observed.tolist()}, expected {expected.tolist()}"
+        )
+    if int(sdc[0, 0]) != 1 or bool(np.any(sdc[0, 1 : expected.size] != 0)):
+        raise VictimCheckpointError("only controlled slot 0 may be the SDC")
+    return {
+        "world": 0,
+        "slots": list(range(expected.size)),
+        "stable_ids": expected.tolist(),
+        "sdc_slot": 0,
+    }
+
+
 def assert_policy_frozen(policy: Any) -> None:
     if bool(getattr(policy, "training", True)):
         raise VictimCheckpointError("victim policy is not in eval mode")

@@ -1,0 +1,123 @@
+{
+  "schema": "gpudrive_transformer_ppo_config",
+  "schema_version": 1,
+  "purpose": "highway_10agent_training_pilot",
+  "research_claims_allowed": false,
+  "methodology_source": {
+    "repository": "https://github.com/soreng25/Adversarial-Transformer-PPO-agent-in-Cartpole.git",
+    "commit": "315b14a90b252ba416eb329e8003d5926806ba67"
+  },
+  "approved_choices": {
+    "approved_at": "2026-08-14",
+    "victims": "ten_pinned_pretrained_ppo_agents_shared_frozen_weights",
+    "focal_intervention": "slot0_decoded_physical_control_residual",
+    "failure": "any_controlled_agent_vehicle_nonvehicle_or_road_object_contact",
+    "eligibility": "all_ten_nominal_clean_goal_success",
+    "background": "all_other_dynamic_objects_removed",
+    "distance_to_failure": "minimum_signed_oriented_vehicle_footprint_clearance"
+  },
+  "environment": {
+    "scene_source": "derived_highway_10ppo_scene",
+    "scene_config": "configs/multiagent/highway_10agent.json",
+    "num_worlds": 1,
+    "max_controlled_agents": 10,
+    "victim_slot": 0,
+    "episode_horizon": 91,
+    "decision_period_steps": 1,
+    "collision_behavior": "ignore",
+    "background_behavior": "none",
+    "stop_on_first_failure": true
+  },
+  "intervention": {
+    "dimensions": 2,
+    "names": ["delta_acceleration", "delta_steering"],
+    "bounds": [0.667, 0.262],
+    "nominal_order": ["acceleration", "steering", "head_angle"],
+    "final_acceleration_envelope": [-4.0, 4.0],
+    "final_steering_envelope": [-3.142, 3.142],
+    "head_angle_rule": "preserve_nominal",
+    "apply_after_discrete_decode": true,
+    "requantize": false
+  },
+  "prior": {
+    "family": "tanh_squashed_normal",
+    "base_mean": [0.0, 0.0],
+    "base_std": [0.5, 0.5],
+    "density": "exact_change_of_variables",
+    "reward_term": "nll_excess_from_zero_disturbance",
+    "epsilon": 0.000001
+  },
+  "failure": {
+    "scope": "any_controlled_agent",
+    "post_step_raw_info_indices": {
+      "road_object_contact": 0,
+      "vehicle_collision": 1,
+      "nonvehicle_collision": 2,
+      "goal": 3
+    },
+    "failure_if_any": [
+      "road_object_contact",
+      "vehicle_collision",
+      "nonvehicle_collision"
+    ],
+    "goal_is_failure": false,
+    "horizon_is_failure": false,
+    "safety_wins_goal_ties": true
+  },
+  "eligibility": {
+    "require_all_controlled_clean_goals": true,
+    "controlled_agent_count": 10,
+    "zero_disturbance": [0.0, 0.0],
+    "exclude_initial_event": true
+  },
+  "token": {
+    "victim_observation_dim": 2984,
+    "previous_nominal_command_dim": 3,
+    "previous_applied_disturbance_dim": 2,
+    "token_dim": 2989,
+    "history_length": 50,
+    "current_victim_action_visible": false,
+    "initial_previous_values": "zeros"
+  },
+  "model": {
+    "d_model": 64,
+    "nhead": 1,
+    "num_layers": 1,
+    "dim_feedforward": 64,
+    "dropout": 0.0,
+    "activation": "relu",
+    "latent_name": "pre_actor_features",
+    "action_dimensions": 2,
+    "initial_log_std": -0.5,
+    "min_log_std": -5.0,
+    "max_log_std": 1.0
+  },
+  "reward": {
+    "failure_bonus": 1.0,
+    "nll_coefficient": 0.01,
+    "nonfailure_shaping": "terminal_minimum_signed_obb_clearance",
+    "normalization": "divide_by_positive_initial_minimum_clearance_then_clip_0_1",
+    "calibration_status": "single_scene_pilot_not_for_generalization"
+  },
+  "ppo": {
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "learning_rate": 0.0003,
+    "clip_ratio": 0.2,
+    "value_clip": 0.2,
+    "value_coefficient": 0.5,
+    "entropy_coefficient": 0.0,
+    "max_grad_norm": 0.5,
+    "update_epochs": 4,
+    "minibatch_size": 128,
+    "normalize_advantages": true
+  },
+  "training": {
+    "iterations": 100,
+    "transitions_per_iteration": 3185,
+    "checkpoint_every_iterations": 1,
+    "deterministic_adversary_evaluation": true,
+    "seed": 42,
+    "device": "cuda"
+  }
+}

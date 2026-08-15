@@ -544,7 +544,10 @@ def validate_adversary_checkpoint(path: Path) -> dict[str, Any]:
         is config.get("research_claims_allowed")
         is False
         and manifest.get("purpose") == config.get("purpose")
-        == "tiny_training_smoke_only"
+        and config.get("purpose") in {
+            "tiny_training_smoke_only",
+            "highway_10agent_training_pilot",
+        }
     )
     checks["config"] = (
         approved_config

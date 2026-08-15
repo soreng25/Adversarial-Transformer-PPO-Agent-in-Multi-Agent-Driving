@@ -71,7 +71,7 @@ These are documented adaptations, not claims that the source already provided st
 | Python package version at the commit | `0.4.0` |
 | `external/madrona` gitlink | `4bda33465340fabc2e61fb27f95aa04795a15466` |
 | `external/json` gitlink | `0457de21cffb298c22b629e538036bfeb96130b7` |
-| Upstream `uv.lock` SHA-256 | `d4f6fe3df752ae9f5cf4fd3e8c510870273fefc4e3c0f3df401f16a62ef7a04d` |
+| Upstream `uv.lock` SHA-256 | `bd0af4c8fda0c7932f9296f22ab1df3c52cbe92320884b0ea1aa994ab6fc28a2` |
 
 This exact GPUDrive commit and both recursive submodule revisions are normative. The reference runtime will be Linux x86-64, Python 3.11, CUDA 12.4, and a digest-pinned NVIDIA container. The native extension and Madrona kernel cache are build artifacts and receive their own hashes.
 
