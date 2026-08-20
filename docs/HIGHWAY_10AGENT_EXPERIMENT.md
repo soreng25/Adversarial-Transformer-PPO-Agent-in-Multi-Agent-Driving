@@ -74,6 +74,10 @@ The default output is `artifacts/highway-10agent/failure-0094/`. The command:
 
 The disturbed slot-0 vehicle is outlined and labeled in red. Any agent carrying
 a post-step safety flag at the first failure is marked with a gold cross. A
+finished vehicle that GPUDrive has moved to its out-of-bounds sentinel position
+is excluded from automatic camera framing and from subsequent trajectory points.
+Thus goal-completed agents cannot cause the animation to zoom away from the
+remaining traffic. A
 failure GIF is not published if the selected checkpoint no longer reproduces
 the recorded failure or if the repeated replay differs. This command provides
 a same-process repeat-replay check; the separate fresh-process replay gate

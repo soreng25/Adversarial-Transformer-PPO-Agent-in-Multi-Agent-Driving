@@ -9,6 +9,9 @@ import pytest
 from gpudrive_adversary.cli import build_parser
 from gpudrive_adversary.multiagent.environment import MultiAgentRollout
 from gpudrive_adversary.multiagent.replay import (
+    _FrameCaptureBackend,
+    _camera_zoom_radius,
+    _visible_position_mask,
     MultiAgentReplayError,
     compare_failure_replays,
     failure_signature,
@@ -108,3 +111,19 @@ def test_render_cli_contract() -> None:
     )
     assert args.checkpoint == "iteration-0094"
     assert args.zoom_radius == 70
+
+
+def test_camera_ignores_done_and_out_of_bounds_agents() -> None:
+    class State:
+        boxes = np.asarray(
+            [
+                [0.0, 0.0, 0.0, 4.0, 2.0],
+                [30.0, 0.0, 0.0, 4.0, 2.0],
+                [1000.0, 1000.0, 0.0, 4.0, 2.0],
+            ]
+        )
+        done = np.asarray([False, False, True])
+
+    assert _visible_position_mask(State.boxes).tolist() == [True, True, False]
+    assert _camera_zoom_radius(State(), 20) == 40
+    assert callable(_FrameCaptureBackend.step)

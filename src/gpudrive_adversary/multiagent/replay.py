@@ -210,17 +210,7 @@ class _FrameCaptureBackend:
             env_indices=[0],
             time_steps=[self.backend.timestep],
             center_agent_indices=[0],
-            zoom_radius=max(
-                self.zoom_radius,
-                int(
-                    np.ceil(
-                        np.linalg.norm(
-                            state.boxes[:, :2] - state.boxes[0, :2], axis=1
-                        ).max()
-                    )
-                )
-                + 10,
-            ),
+            zoom_radius=_camera_zoom_radius(state, self.zoom_radius),
             plot_log_replay_trajectory=False,
         )
         _require(len(figures) == 1, "GPUDrive returned an unexpected number of figures")
@@ -242,7 +232,7 @@ class _FrameCaptureBackend:
             axis.text(x, y, f"  FAILURE slot {int(slot)}", color="#8c2d04", fontsize=10, fontweight="bold", zorder=23)
         label = f"t={self.backend.timestep} ({0.1 * self.backend.timestep:.1f} s)"
         if failing.size:
-            label += " — first safety failure"
+            label += " -- first safety failure"
         figure.text(0.01, 0.99, label, va="top", ha="left", fontsize=12, fontweight="bold")
         figure.canvas.draw()
         rgba = np.asarray(figure.canvas.buffer_rgba(), dtype=np.uint8)
@@ -260,6 +250,28 @@ class _FrameCaptureBackend:
         self._capture(state)
         return state
 
+
+def _visible_position_mask(boxes: np.ndarray) -> np.ndarray:
+    """Identify simulator positions that have not been moved out of bounds."""
+
+    centers = np.asarray(boxes, dtype=np.float64)[..., :2]
+    return np.isfinite(centers).all(axis=-1) & (np.abs(centers) < 900.0).all(axis=-1)
+
+
+def _camera_zoom_radius(state: Any, minimum_radius: int) -> int:
+    """Frame only live, in-bounds agents so removed cars cannot expand the view."""
+
+    boxes = np.asarray(state.boxes, dtype=np.float64)
+    visible = _visible_position_mask(boxes) & ~np.asarray(state.done, dtype=np.bool_)
+    # Keep the focal car as the center even if a future collision mode marks it
+    # done on the failure transition. Its coordinates must still be in bounds.
+    if _visible_position_mask(boxes[[0]])[0]:
+        visible[0] = True
+    centers = boxes[visible, :2]
+    if centers.size == 0:
+        return int(minimum_radius)
+    farthest = float(np.linalg.norm(centers - boxes[0, :2], axis=1).max())
+    return max(int(minimum_radius), int(np.ceil(farthest)) + 10)
 
 def _write_diagnostic_plots(
     output: Path,
@@ -286,6 +298,10 @@ def _write_diagnostic_plots(
     colors = plt.cm.tab10(np.linspace(0.0, 1.0, AGENT_COUNT))
     for slot in range(AGENT_COUNT):
         centers = rollout.boxes[:, slot, :2]
+        visible = _visible_position_mask(rollout.boxes[:, slot])
+        centers = centers[visible]
+        if centers.size == 0:
+            continue
         width = 3.0 if slot == 0 else 1.4
         label = f"slot {slot}, id {object_ids[slot]}" + (" (disturbed)" if slot == 0 else "")
         axis.plot(centers[:, 0], centers[:, 1], color=colors[slot], linewidth=width, label=label)
