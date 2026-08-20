@@ -251,8 +251,7 @@ def train_highway_multiagent(
                 f"iteration {iteration:03d}/{int(config['training']['iterations']):03d} "
                 f"episodes={row['episodes']} failures={row['failures']} "
                 f"failure_rate={100.0 * row['failure_rate']:.2f}% "
-                f"mean_min_clearance={row['mean_episode_minimum_clearance']:.3f} m "
-                f"deterministic={row['deterministic_evaluation']['termination_reason']}",
+                f"mean_min_clearance={row['mean_episode_minimum_clearance']:.3f} m",
                 flush=True,
             )
             checkpoint_manifest = save_adversary_checkpoint(

@@ -39,9 +39,53 @@ From the repository root with the previously built pinned GPUDrive environment:
 bash scripts/run_highway_10agent.sh 2>&1 | tee highway-10agent.log
 ```
 
-The script downloads only the pinned source scene if missing, checks its SHA-256, builds the ten-object scene, certifies the clean rollout, then trains for 100 PPO iterations. Each iteration prints sampled episode count, failure count/rate, mean minimum clearance, and deterministic evaluation outcome.
+The script downloads only the pinned source scene if missing, checks its SHA-256, builds the ten-object scene, certifies the clean rollout, then trains for 100 PPO iterations. Each iteration prints only sampled training results: episode count, failure count/rate, and mean minimum clearance. The separate deterministic evaluation remains stored in the checkpoint metrics for replay selection, but is intentionally omitted from the training-results line to avoid mixing two different populations.
 
 To monitor a detached run, launch it using the site's approved job/session mechanism (for example `tmux` if available), then follow `highway-10agent.log`. Do not assume an SSH process survives logout unless the NASA host's scheduler or session manager guarantees it.
+
+## Replay and visualize a failure
+
+The training run stores every iteration checkpoint, including its separate
+deterministic evaluation result. Choose a checkpoint whose
+`metrics.deterministic_evaluation.failure_timestep` is an integer. In the first
+100-iteration pilot, iteration 94 was one such checkpoint. Render it from the
+repository root on the same Linux/CUDA machine:
+
+```bash
+bash scripts/render_highway_failure.sh iteration-0094
+```
+
+The default output is `artifacts/highway-10agent/failure-0094/`. The command:
+
+1. validates the complete parent training artifact and selected checkpoint;
+2. reloads the same frozen victim and trained adversary weights;
+3. performs deterministic mean-action replay twice from the exact derived scene;
+4. requires the training-time, first-replay, and repeated-replay failure action
+   index to agree; and
+5. exports:
+   - `failure.gif`, a 10-frame-per-second top-down animation;
+   - `failure-frame.png`, the immediate post-action failure state;
+   - `trajectories.png`, paths for all ten agents;
+   - `clearance.png`, signed minimum pairwise vehicle clearance over time;
+   - `controls.png`, nominal/applied focal commands and effective disturbance;
+   - `failure-trace.npz`, the numerical trajectory behind the figures; and
+   - `manifest.json`, hashes, identities, event details, and the repeat-replay
+     certificate.
+
+The disturbed slot-0 vehicle is outlined and labeled in red. Any agent carrying
+a post-step safety flag at the first failure is marked with a gold cross. A
+failure GIF is not published if the selected checkpoint no longer reproduces
+the recorded failure or if the repeated replay differs. This command provides
+a same-process repeat-replay check; the separate fresh-process replay gate
+required for the complete Milestone D research artifact remains to be added.
+
+To use another output directory or a wider minimum camera radius, pass the
+radius as the second argument and set the output environment variable:
+
+```bash
+GPUDRIVE_FAILURE_OUTPUT=artifacts/highway-10agent/failure-0094-wide \
+  bash scripts/render_highway_failure.sh iteration-0094 90
+```
 
 After completion:
 

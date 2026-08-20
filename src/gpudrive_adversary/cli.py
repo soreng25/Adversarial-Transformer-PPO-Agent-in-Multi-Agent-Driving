@@ -21,6 +21,7 @@ from .adversary.training_artifact import (
 from .doctor import build_doctor_report
 from .multiagent.artifact import validate_multiagent_training_artifact
 from .multiagent.environment import MultiAgentEnvironmentError
+from .multiagent.replay import MultiAgentReplayError, render_highway_failure
 from .multiagent.scene import MultiAgentSceneError
 from .multiagent.training import MultiAgentTrainingError, train_highway_multiagent
 from .pins import (
@@ -218,6 +219,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     highway_validate.add_argument("artifact", type=Path)
     highway_validate.add_argument("--output", type=Path)
+
+    highway_render = subparsers.add_parser(
+        "render-highway-failure",
+        help="Replay a deterministic ten-agent failure and export a GIF and diagnostic plots.",
+    )
+    _add_pin_and_source(highway_render)
+    highway_render.add_argument("--run", type=Path, required=True)
+    highway_render.add_argument(
+        "--checkpoint",
+        required=True,
+        help="Checkpoint directory name beneath RUN/checkpoints, for example iteration-0094.",
+    )
+    highway_render.add_argument("--victim-pin", type=Path)
+    highway_render.add_argument("--victim-checkpoint", type=Path)
+    highway_render.add_argument("--zoom-radius", type=int, default=70)
+    highway_render.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -410,6 +427,32 @@ def main(argv: list[str] | None = None) -> int:
             report = validate_multiagent_training_artifact(args.artifact)
             _write_or_print(report, args.output)
             return 0 if report["ok"] else 1
+
+        if args.command == "render-highway-failure":
+            manifest = render_highway_failure(
+                source=args.source,
+                run=args.run,
+                checkpoint=args.checkpoint,
+                output=args.output,
+                checkpoint_directory=args.victim_checkpoint,
+                victim_pin_path=args.victim_pin,
+                gpudrive_pin_path=args.pins,
+                zoom_radius=args.zoom_radius,
+            )
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "artifact": str(args.output.resolve()),
+                        "artifact_id": manifest["artifact_id"],
+                        "failure": manifest["failure"],
+                        "files": sorted(manifest["files"]),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
     except (
         AdversaryCheckpointError,
         AdversaryConfigError,
@@ -417,6 +460,7 @@ def main(argv: list[str] | None = None) -> int:
         AdversaryTrainingError,
         PinError,
         MultiAgentEnvironmentError,
+        MultiAgentReplayError,
         MultiAgentSceneError,
         MultiAgentTrainingError,
         SmokeError,

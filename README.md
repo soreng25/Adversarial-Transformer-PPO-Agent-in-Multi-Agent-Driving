@@ -10,3 +10,14 @@ Pinned revisions:
 - GPUDrive: `aa48a431ed127a37610cc2176db30ec73d0c55df`
 
 Start with [Milestone A](docs/MILESTONE_A.md), [Milestone B](docs/MILESTONE_B.md), [Milestone C](docs/MILESTONE_C.md), and the current [ten-agent highway pilot](docs/HIGHWAY_10AGENT_EXPERIMENT.md). The unresolved research-scale choices remain in the [methodology map](docs/CARTPOLE_TO_GPUDRIVE_MAP.md) and [research gate](docs/PROJECT_SPEC.md#8-research-decisions-and-gates).
+
+After a highway run, replay and render a deterministic failing checkpoint with:
+
+```bash
+bash scripts/render_highway_failure.sh iteration-0094
+```
+
+This creates a top-down GIF, exact failure frame, trajectory, clearance and
+control plots, the numerical failure trace, and a same-process repeat-replay
+certificate. See the highway pilot document for checkpoint-selection and output
+details.
