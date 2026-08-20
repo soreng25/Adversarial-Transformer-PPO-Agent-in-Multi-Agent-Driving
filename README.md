@@ -21,3 +21,8 @@ This creates a top-down GIF, exact failure frame, trajectory, clearance and
 control plots, the numerical failure trace, and a same-process repeat-replay
 certificate. See the highway pilot document for checkpoint-selection and output
 details.
+
+The follow-up [slots 1-9 system-failure experiment](docs/NONFOCAL_SYSTEM_EXPERIMENT.md)
+uses the mentor-approved objective: slot 0 is disturbed, but only failures
+entirely attributable to slots 1-9 receive credit. Its separate runner preserves
+the original any-agent pilot artifacts for comparison.

@@ -24,6 +24,10 @@ def default_highway_config_path() -> Path:
     return repository_root() / "configs/multiagent/highway_10agent.json"
 
 
+def default_nonfocal_highway_config_path() -> Path:
+    return repository_root() / "configs/multiagent/highway_10agent_nonfocal_system.json"
+
+
 def load_highway_experiment_config(path: Path | str | None = None) -> dict[str, Any]:
     source = Path(path) if path is not None else default_highway_config_path()
     try:
@@ -32,6 +36,16 @@ def load_highway_experiment_config(path: Path | str | None = None) -> dict[str, 
         raise MultiAgentSceneError(f"cannot load highway experiment config: {exc}") from exc
     _require(config.get("schema") == "gpudrive_highway_10agent_experiment", "unsupported highway experiment schema")
     _require(config.get("schema_version") == 1, "unsupported highway experiment version")
+    purpose = config.get("purpose")
+    _require(
+        purpose
+        in {
+            "single_scene_emergent_multiagent_failure_pilot",
+            "single_scene_nonfocal_system_failure_pilot",
+        },
+        "unsupported highway experiment purpose",
+    )
+    nonfocal_system = purpose == "single_scene_nonfocal_system_failure_pilot"
     scene = config.get("scene", {})
     dataset = config.get("dataset", {})
     _require(dataset.get("repository") == "EMERGE-lab/GPUDrive_mini", "unexpected scene dataset")
@@ -48,8 +62,23 @@ def load_highway_experiment_config(path: Path | str | None = None) -> dict[str, 
     _require(config["control"].get("focal_slot") == 0, "the disturbed agent must be slot 0")
     _require(config.get("intervention", {}).get("bounds") == [0.667, 0.262], "approved disturbance bounds changed")
     _require(config.get("eligibility", {}).get("all_ten_clean_goal_success") is True, "all ten clean goals are required")
-    _require(config.get("failure", {}).get("scope") == "any_controlled_agent", "global controlled-agent failure is required")
-    _require(config.get("reward", {}).get("nonfailure_shaping") == "terminal_minimum_signed_obb_clearance", "clearance reward changed")
+    expected_scope = (
+        "nonfocal_slots_1_through_9_only"
+        if nonfocal_system
+        else "any_controlled_agent"
+    )
+    _require(config.get("failure", {}).get("scope") == expected_scope, "failure scope changed")
+    expected_shaping = (
+        "terminal_minimum_signed_nonfocal_obb_clearance"
+        if nonfocal_system
+        else "terminal_minimum_signed_obb_clearance"
+    )
+    _require(config.get("reward", {}).get("nonfailure_shaping") == expected_shaping, "clearance reward changed")
+    if nonfocal_system:
+        failure = config["failure"]
+        _require(failure.get("focal_slot_events") == "diagnostic_only_no_reward_no_termination", "focal events must remain diagnostics")
+        _require(failure.get("vehicle_collision_qualifier") == "both_participants_slots_1_through_9_with_raw_flags_and_obb_contact", "non-focal collision attribution changed")
+        _require(float(failure.get("obb_contact_tolerance_m", -1)) == 0.00001, "contact tolerance changed")
     return config
 
 

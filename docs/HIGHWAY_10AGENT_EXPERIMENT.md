@@ -1,6 +1,12 @@
 # Ten-agent highway pilot
 
-This is the current mentor-approved experiment. It is a one-scene pilot for testing the mechanics and observing multi-agent failure behavior; it is not yet a population-level result.
+This is the original one-scene any-agent pilot used to test mechanics and observe multi-agent failure behavior; it is not a population-level result.
+
+> Historical objective: this document preserves the original any-agent pilot.
+> Its checkpoint-94 slot-0 road contact revealed that the failure reward was too
+> permissive. New training uses the separate
+> [slots 1-9 system-failure objective](NONFOCAL_SYSTEM_EXPERIMENT.md); the old
+> artifact remains valid only as a diagnostic and reproducibility record.
 
 ## Exact experiment
 

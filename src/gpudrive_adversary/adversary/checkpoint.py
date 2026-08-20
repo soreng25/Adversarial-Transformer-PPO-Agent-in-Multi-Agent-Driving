@@ -547,6 +547,7 @@ def validate_adversary_checkpoint(path: Path) -> dict[str, Any]:
         and config.get("purpose") in {
             "tiny_training_smoke_only",
             "highway_10agent_training_pilot",
+            "highway_10agent_nonfocal_system_training_pilot",
         }
     )
     checks["config"] = (

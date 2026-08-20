@@ -53,8 +53,20 @@ def validate_adversary_config(config: dict[str, Any]) -> dict[str, Any]:
 
     methodology = config.get("methodology_source", {})
     purpose = config.get("purpose")
-    _require(purpose in {"tiny_training_smoke_only", "highway_10agent_training_pilot"}, "unsupported adversary configuration purpose")
-    highway = purpose == "highway_10agent_training_pilot"
+    _require(
+        purpose
+        in {
+            "tiny_training_smoke_only",
+            "highway_10agent_training_pilot",
+            "highway_10agent_nonfocal_system_training_pilot",
+        },
+        "unsupported adversary configuration purpose",
+    )
+    highway = purpose in {
+        "highway_10agent_training_pilot",
+        "highway_10agent_nonfocal_system_training_pilot",
+    }
+    nonfocal_system = purpose == "highway_10agent_nonfocal_system_training_pilot"
     _require(config.get("research_claims_allowed") is False, "training config cannot authorize research claims")
     _require(
         methodology.get("repository")
@@ -83,7 +95,12 @@ def validate_adversary_config(config: dict[str, Any]) -> dict[str, Any]:
     _require(len(prior.get("base_std", [])) == 2 and all(float(value) > 0 for value in prior["base_std"]), "prior base_std must contain two positive values")
     _require(prior.get("density") == "exact_change_of_variables", "prior density accounting changed")
     _require(prior.get("reward_term") == "nll_excess_from_zero_disturbance", "likelihood penalty definition changed")
-    _require(failure.get("scope") == ("any_controlled_agent" if highway else "victim_only"), "failure scope changed")
+    expected_failure_scope = (
+        "nonfocal_slots_1_through_9_only"
+        if nonfocal_system
+        else ("any_controlled_agent" if highway else "victim_only")
+    )
+    _require(failure.get("scope") == expected_failure_scope, "failure scope changed")
     _require(
         failure.get("post_step_raw_info_indices")
         == {
@@ -101,6 +118,21 @@ def validate_adversary_config(config: dict[str, Any]) -> dict[str, Any]:
     )
     _require(failure.get("goal_is_failure") is False and failure.get("horizon_is_failure") is False, "goal/horizon cannot silently become failures")
     _require(failure.get("safety_wins_goal_ties") is True, "safety must win simultaneous goal ties")
+    if nonfocal_system:
+        _require(
+            failure.get("focal_slot_events")
+            == "diagnostic_only_no_reward_no_termination",
+            "focal-only events must not count as system failures",
+        )
+        _require(
+            failure.get("vehicle_collision_qualifier")
+            == "both_participants_slots_1_through_9_with_raw_flags_and_obb_contact",
+            "non-focal collision attribution changed",
+        )
+        _require(
+            float(failure.get("obb_contact_tolerance_m", -1)) == 0.00001,
+            "non-focal collision contact tolerance changed",
+        )
     if highway:
         _require(eligibility.get("require_all_controlled_clean_goals") is True, "all ten clean goals are required")
         _require(eligibility.get("controlled_agent_count") == 10, "eligibility agent count changed")
@@ -116,7 +148,12 @@ def validate_adversary_config(config: dict[str, Any]) -> dict[str, Any]:
     _require(float(reward.get("failure_bonus", 0)) == 1.0, "smoke failure bonus changed")
     _require(float(reward.get("nll_coefficient", -1)) == 0.01, "smoke NLL coefficient changed")
     if highway:
-        _require(reward.get("nonfailure_shaping") == "terminal_minimum_signed_obb_clearance", "highway clearance reward changed")
+        expected_shaping = (
+            "terminal_minimum_signed_nonfocal_obb_clearance"
+            if nonfocal_system
+            else "terminal_minimum_signed_obb_clearance"
+        )
+        _require(reward.get("nonfailure_shaping") == expected_shaping, "highway clearance reward changed")
         _require(reward.get("normalization") == "divide_by_positive_initial_minimum_clearance_then_clip_0_1", "clearance normalization changed")
         _require(reward.get("calibration_status") == "single_scene_pilot_not_for_generalization", "pilot calibration status changed")
     else:

@@ -1,0 +1,73 @@
+{
+  "schema": "gpudrive_highway_10agent_experiment",
+  "schema_version": 1,
+  "purpose": "single_scene_nonfocal_system_failure_pilot",
+  "research_claims_allowed": false,
+  "dataset": {
+    "repository": "EMERGE-lab/GPUDrive_mini",
+    "revision": "f0abb649610379e70d0b3105745550fa7acc90d0",
+    "split": "validation"
+  },
+  "scene": {
+    "selection_rule": "source_sdc_then_nine_nearest_reset_valid_moving_controllable_vehicles",
+    "selection": {
+      "minimum_initial_speed_mps": 5.0,
+      "minimum_recorded_displacement_m": 10.0,
+      "minimum_valid_samples": 10,
+      "distance_metric": "initial_center_euclidean_m",
+      "tie_break": "ascending_object_id"
+    },
+    "source_relative_path": "validation/tfrecord-00107-of-00150_281.json",
+    "source_sha256": "1f2e221207cefe8c43a27eef93cb82a3fe3d6bba7553a70de8f0762ef17173ec",
+    "scenario_id": "a8ce823178390d2c",
+    "derived_name": "highway-a8ce823178390d2c-10ppo.json",
+    "selected_object_ids": [1460, 844, 846, 845, 843, 850, 858, 862, 857, 859],
+    "focal_object_id": 1460,
+    "derived_canonical_sha256": "125ea611a5d7dd9aae52d08e0d5c22931e2db7dbdfc55fdf2c6c434df215f1e4"
+  },
+  "control": {
+    "controlled_agents": 10,
+    "policy": "pinned_pretrained_ppo_shared_weights_deterministic_argmax",
+    "focal_slot": 0,
+    "remove_all_other_dynamic_objects": true,
+    "background_behavior": "none"
+  },
+  "intervention": {
+    "dimensions": 2,
+    "bounds": [0.667, 0.262],
+    "final_acceleration_envelope": [-4.0, 4.0],
+    "final_steering_envelope": [-3.142, 3.142],
+    "apply_to_slot": 0,
+    "head_angle_rule": "preserve_nominal"
+  },
+  "failure": {
+    "scope": "nonfocal_slots_1_through_9_only",
+    "failure_if_any": ["road_object_contact", "vehicle_collision", "nonvehicle_collision"],
+    "vehicle_collision_qualifier": "both_participants_slots_1_through_9_with_raw_flags_and_obb_contact",
+    "obb_contact_tolerance_m": 0.00001,
+    "focal_slot_events": "diagnostic_only_no_reward_no_termination",
+    "goal_is_failure": false,
+    "horizon_is_failure": false,
+    "stop_on_first_failure": true
+  },
+  "eligibility": {
+    "zero_disturbance": [0.0, 0.0],
+    "all_ten_clean_goal_success": true,
+    "no_clean_safety_failure": true,
+    "exclude_initial_event": true
+  },
+  "reward": {
+    "failure_bonus": 1.0,
+    "nll_coefficient": 0.01,
+    "nonfailure_shaping": "terminal_minimum_signed_nonfocal_obb_clearance",
+    "normalization": "divide_by_positive_initial_minimum_clearance_then_clip_0_1",
+    "nonfailure_terminal_range": [-1.0, 0.0]
+  },
+  "training": {
+    "episode_horizon": 91,
+    "iterations": 100,
+    "transitions_per_iteration": 3185,
+    "seed": 42,
+    "device": "cuda"
+  }
+}

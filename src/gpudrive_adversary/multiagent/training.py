@@ -35,7 +35,15 @@ from ..pins import canonical_json_sha256, load_pins, repository_root, required_c
 from ..provenance import port_identity
 from ..victim.checkpoint import checkpoint_identity, default_checkpoint_directory, load_victim_pin, verify_checkpoint
 from ..victim.policy import assert_policy_frozen, load_frozen_policy, pinned_action_table, torch_module_state_sha256, validate_multiagent_binding
-from .environment import AGENT_COUNT, MultiAgentRollout, MultiAgentState, MultiAgentVictimPolicy, run_multiagent_rollout
+from .environment import (
+    AGENT_COUNT,
+    ANY_CONTROLLED_FAILURE_SCOPE,
+    MultiAgentRollout,
+    MultiAgentState,
+    MultiAgentVictimPolicy,
+    qualifying_nonfocal_collision_pairs,
+    run_multiagent_rollout,
+)
 from .artifact import validate_multiagent_training_artifact
 from .scene import (
     build_derived_scene,
@@ -110,6 +118,35 @@ def _episode_arrays(rollout: MultiAgentRollout, prior: BoundedTanhNormal, config
     }
 
 
+def _episode_failure_diagnostics(episodes: list[MultiAgentRollout]) -> dict[str, Any]:
+    slot_counts = {str(slot): 0 for slot in range(1, AGENT_COUNT)}
+    kind_counts = {name: 0 for name in ("road_object_contact", "vehicle_collision", "nonvehicle_collision")}
+    pair_counts: dict[str, int] = {}
+    focal_event_episodes = 0
+    for rollout in episodes:
+        if bool(np.any(rollout.raw_info[1:, 0, :3] != 0)):
+            focal_event_episodes += 1
+        if rollout.failure_timestep is None:
+            continue
+        timestep = rollout.failure_timestep
+        for slot in np.flatnonzero(rollout.failing_agents[timestep]):
+            if int(slot) != 0:
+                slot_counts[str(int(slot))] += 1
+        for kind in rollout.failure_kinds[timestep]:
+            kind_counts[kind] += 1
+        for first, second in qualifying_nonfocal_collision_pairs(
+            rollout.raw_info[timestep + 1], rollout.boxes[timestep + 1]
+        ):
+            key = f"{first}-{second}"
+            pair_counts[key] = pair_counts.get(key, 0) + 1
+    return {
+        "qualifying_failures_by_slot": slot_counts,
+        "qualifying_failures_by_kind": kind_counts,
+        "qualifying_vehicle_collision_pairs": dict(sorted(pair_counts.items())),
+        "episodes_with_focal_safety_event": focal_event_episodes,
+    }
+
+
 def _payload(rollout: MultiAgentRollout, arrays: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     failure_bits = np.zeros((rollout.transition_count, AGENT_COUNT, 3), dtype=np.int8)
     for timestep in range(rollout.transition_count):
@@ -156,6 +193,8 @@ def train_highway_multiagent(
     adversary_path = adversary_config_path or repository_root() / "configs/adversary/highway_10agent_transformer_ppo.json"
     config = load_adversary_config(adversary_path); experiment = load_highway_experiment_config(experiment_config_path)
     _require(config["intervention"]["bounds"] == experiment["intervention"]["bounds"], "experiment and PPO disturbance bounds differ")
+    _require(config["failure"]["scope"] == experiment["failure"]["scope"], "experiment and PPO failure scopes differ")
+    _require(config["reward"]["nonfailure_shaping"] == experiment["reward"]["nonfailure_shaping"], "experiment and PPO clearance objectives differ")
     pins = load_pins(gpudrive_pin_path); victim_pin = load_victim_pin(victim_pin_path); source = source.resolve()
     checkpoint = checkpoint_directory.resolve() if checkpoint_directory else default_checkpoint_directory(victim_pin).resolve()
     source_checks = verify_source_tree(source, pins); _require(required_checks_pass(source_checks), "pinned GPUDrive source verification failed")
@@ -194,7 +233,12 @@ def train_highway_multiagent(
         victim = MultiAgentVictimPolicy(victim_model, table, torch, device=device)
         backend = GPUDriveTenAgentBackend(env, torch, device=device, horizon=91, expected_ids=experiment["scene"]["selected_object_ids"], scenario_id=experiment["scene"]["scenario_id"], agent_scale=float(AGENT_SCALE))
         intervention = _intervention(config)
-        nominal = run_multiagent_rollout(backend=backend, victim=victim, adversary=_ZeroAdversary(), intervention=intervention, max_steps=91, adversary_deterministic=True)
+        nominal = run_multiagent_rollout(
+            backend=backend, victim=victim, adversary=_ZeroAdversary(),
+            intervention=intervention, max_steps=91,
+            adversary_deterministic=True,
+            failure_scope=ANY_CONTROLLED_FAILURE_SCOPE,
+        )
         _require(nominal.failure_timestep is None, "clean ten-agent rollout has a safety failure")
         _require(nominal.all_goals_reached and nominal.termination_reason == "all_goals_reached", "not all ten PPO vehicles complete their goals cleanly")
         print(
@@ -226,31 +270,64 @@ def train_highway_multiagent(
         }
         metrics: list[dict[str, Any]] = []; checkpoint_ids: list[str] = []; total_transitions = 0
         last_training = last_training_arrays = last_evaluation = last_evaluation_arrays = None
+        failure_scope = str(config["failure"]["scope"])
         for iteration in range(1, int(config["training"]["iterations"]) + 1):
             episodes: list[MultiAgentRollout] = []; batches: list[dict[str, np.ndarray]] = []; collected = 0
             while collected < int(config["training"]["transitions_per_iteration"]):
-                rollout = run_multiagent_rollout(backend=backend, victim=victim, adversary=adversary, intervention=intervention, max_steps=91)
+                rollout = run_multiagent_rollout(
+                    backend=backend, victim=victim, adversary=adversary,
+                    intervention=intervention, max_steps=91,
+                    failure_scope=failure_scope,
+                )
                 arrays = _episode_arrays(rollout, prior, config); episodes.append(rollout); batches.append(arrays); collected += rollout.transition_count
                 last_training, last_training_arrays = rollout, arrays
             combined = _combine_batches(batches)
             update = _ppo_update(model=model, optimizer=optimizer, batch=combined, config=config, torch=torch, device=device)
             total_transitions += collected; assert_policy_frozen(victim_model); _require(torch_module_state_sha256(victim_model) == victim_state, "victim policy changed")
-            evaluation = run_multiagent_rollout(backend=backend, victim=victim, adversary=adversary, intervention=intervention, max_steps=91, adversary_deterministic=True)
+            evaluation = run_multiagent_rollout(
+                backend=backend, victim=victim, adversary=adversary,
+                intervention=intervention, max_steps=91,
+                adversary_deterministic=True, failure_scope=failure_scope,
+            )
             evaluation_arrays = _episode_arrays(evaluation, prior, config); last_evaluation, last_evaluation_arrays = evaluation, evaluation_arrays
+            diagnostics = _episode_failure_diagnostics(episodes)
+            evaluation_diagnostics = _episode_failure_diagnostics([evaluation])
             row = {
                 "iteration": iteration, "transitions": collected, "total_transitions": total_transitions, "episodes": len(episodes),
                 "failures": sum(item.failure_timestep is not None for item in episodes),
                 "failure_rate": float(np.mean([item.failure_timestep is not None for item in episodes])),
                 "mean_episode_minimum_clearance": float(np.mean([item.episode_minimum_clearance for item in episodes])),
                 "mean_reward": float(np.mean(combined["rewards"])), "mean_nll_penalty": float(np.mean(combined["nll_penalty"])),
-                "deterministic_evaluation": {"failure_timestep": evaluation.failure_timestep, "termination_reason": evaluation.termination_reason, "minimum_clearance": evaluation.episode_minimum_clearance, "return": float(evaluation_arrays["rewards"].sum())},
+                **diagnostics,
+                "deterministic_evaluation": {
+                    "failure_timestep": evaluation.failure_timestep,
+                    "termination_reason": evaluation.termination_reason,
+                    "minimum_clearance": evaluation.episode_minimum_clearance,
+                    "return": float(evaluation_arrays["rewards"].sum()),
+                    "failure_kinds": (
+                        [] if evaluation.failure_timestep is None
+                        else list(evaluation.failure_kinds[evaluation.failure_timestep])
+                    ),
+                    "failing_slots": (
+                        [] if evaluation.failure_timestep is None
+                        else np.flatnonzero(evaluation.failing_agents[evaluation.failure_timestep]).astype(int).tolist()
+                    ),
+                    "qualifying_vehicle_collision_pairs": evaluation_diagnostics["qualifying_vehicle_collision_pairs"],
+                    "focal_safety_event": bool(evaluation_diagnostics["episodes_with_focal_safety_event"]),
+                },
                 **update,
             }
             metrics.append(row)
+            slot_summary = ",".join(
+                f"{slot}:{count}"
+                for slot, count in row["qualifying_failures_by_slot"].items()
+                if count
+            ) or "none"
             print(
                 f"iteration {iteration:03d}/{int(config['training']['iterations']):03d} "
                 f"episodes={row['episodes']} failures={row['failures']} "
                 f"failure_rate={100.0 * row['failure_rate']:.2f}% "
+                f"failure_slots={slot_summary} "
                 f"mean_min_clearance={row['mean_episode_minimum_clearance']:.3f} m",
                 flush=True,
             )

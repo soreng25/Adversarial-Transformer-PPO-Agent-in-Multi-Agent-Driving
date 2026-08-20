@@ -7,14 +7,18 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import gpudrive_adversary.multiagent.artifact as multiagent_artifact
 from gpudrive_adversary.adversary.config import load_adversary_config
 from gpudrive_adversary.adversary.environment import AdversaryDecision
 from gpudrive_adversary.adversary.intervention import InterventionSpec, apply_intervention
 from gpudrive_adversary.multiagent.clearance import minimum_pairwise_clearance, oriented_box_clearance
 from gpudrive_adversary.multiagent.environment import (
     AGENT_COUNT,
+    NONFOCAL_SYSTEM_FAILURE_SCOPE,
     MultiAgentState,
     MultiAgentVictimDecision,
+    classify_multiagent_failure,
+    qualifying_nonfocal_collision_pairs,
     run_multiagent_rollout,
 )
 from gpudrive_adversary.multiagent.scene import build_derived_scene, load_highway_experiment_config
@@ -50,6 +54,15 @@ def test_highway_configs_pin_ten_agents_and_existing_bounds() -> None:
     assert adversary["environment"]["max_controlled_agents"] == 10
     assert adversary["intervention"]["bounds"] == [0.667, 0.262]
     assert adversary["failure"]["scope"] == "any_controlled_agent"
+    system_experiment = load_highway_experiment_config(
+        "configs/multiagent/highway_10agent_nonfocal_system.json"
+    )
+    system_adversary = load_adversary_config(
+        "configs/adversary/highway_10agent_nonfocal_system_transformer_ppo.json"
+    )
+    assert system_experiment["failure"]["scope"] == NONFOCAL_SYSTEM_FAILURE_SCOPE
+    assert system_adversary["failure"]["scope"] == NONFOCAL_SYSTEM_FAILURE_SCOPE
+    assert system_adversary["reward"]["nonfailure_shaping"] == "terminal_minimum_signed_nonfocal_obb_clearance"
 
 
 def test_derived_scene_removes_every_unselected_dynamic_object(tmp_path: Path) -> None:
@@ -146,3 +159,138 @@ def test_failure_of_nondisturbed_agent_is_global_failure() -> None:
     assert rollout.failure_timestep == 0
     assert rollout.failing_agents[0, 7]
     assert rollout.failure_kinds[0] == ("vehicle_collision",)
+
+
+def test_nonfocal_system_failure_excludes_focal_events_and_focal_collisions() -> None:
+    boxes = np.asarray([[slot * 10.0, 0.0, 0.0, 4.0, 2.0] for slot in range(10)])
+    raw = np.zeros((10, 5), dtype=np.float32)
+    raw[0, 0] = 1
+    failed, kinds, agents = classify_multiagent_failure(
+        raw, boxes, scope=NONFOCAL_SYSTEM_FAILURE_SCOPE
+    )
+    assert not failed and kinds == () and not agents.any()
+
+    raw[:] = 0
+    raw[[0, 1], 1] = 1
+    boxes[1, 0] = boxes[0, 0]
+    failed, _, agents = classify_multiagent_failure(
+        raw, boxes, scope=NONFOCAL_SYSTEM_FAILURE_SCOPE
+    )
+    assert not failed and not agents.any()
+    assert qualifying_nonfocal_collision_pairs(raw, boxes) == ()
+
+
+def test_nonfocal_system_failure_requires_nonfocal_road_event_or_pair() -> None:
+    boxes = np.asarray([[slot * 10.0, 0.0, 0.0, 4.0, 2.0] for slot in range(10)])
+    raw = np.zeros((10, 5), dtype=np.float32)
+    raw[4, 0] = 1
+    failed, kinds, agents = classify_multiagent_failure(
+        raw, boxes, scope=NONFOCAL_SYSTEM_FAILURE_SCOPE
+    )
+    assert failed and kinds == ("road_object_contact",)
+    assert np.flatnonzero(agents).tolist() == [4]
+
+    raw[:] = 0
+    raw[[2, 3], 1] = 1
+    boxes[3, :2] = boxes[2, :2]
+    failed, kinds, agents = classify_multiagent_failure(
+        raw, boxes, scope=NONFOCAL_SYSTEM_FAILURE_SCOPE
+    )
+    assert failed and kinds == ("vehicle_collision",)
+    assert np.flatnonzero(agents).tolist() == [2, 3]
+    assert qualifying_nonfocal_collision_pairs(raw, boxes) == ((2, 3),)
+
+
+def test_nonfocal_rollout_continues_after_focal_event_until_system_failure() -> None:
+    class Backend:
+        def __init__(self):
+            self.steps = 0
+
+        def state(self) -> MultiAgentState:
+            raw = np.zeros((10, 5), dtype=np.float32)
+            boxes = np.asarray(
+                [[slot * 10.0, 0.0, 0.0, 4.0, 2.0] for slot in range(10)]
+            )
+            if self.steps == 1:
+                raw[0, 0] = 1
+            elif self.steps == 2:
+                raw[[2, 3], 1] = 1
+                boxes[3, :2] = boxes[2, :2]
+            return MultiAgentState(
+                np.zeros((10, 2984), dtype=np.float32),
+                raw,
+                boxes,
+                np.zeros(10, dtype=np.bool_),
+                False,
+            )
+
+        def reset(self) -> MultiAgentState:
+            self.steps = 0
+            return self.state()
+
+        def step(self, commands: np.ndarray) -> MultiAgentState:
+            self.steps += 1
+            return self.state()
+
+    rollout = run_multiagent_rollout(
+        backend=Backend(),
+        victim=_Victim(),
+        adversary=_Adversary((0.0, 0.0)),
+        intervention=_intervention(),
+        max_steps=5,
+        failure_scope=NONFOCAL_SYSTEM_FAILURE_SCOPE,
+    )
+    assert rollout.failure_timestep == 1
+    assert rollout.failure_by_transition.tolist() == [False, True]
+    assert np.flatnonzero(rollout.failing_agents[-1]).tolist() == [2, 3]
+    assert rollout.raw_info[1, 0, 0] == 1
+
+
+def test_nonfocal_run_summary_ranks_slots_and_pairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        multiagent_artifact,
+        "validate_multiagent_training_artifact",
+        lambda path: {"ok": True, "failed_checks": []},
+    )
+    metrics = []
+    for failures, slots, pairs in (
+        (2, {"1": 2, "2": 1}, {"1-2": 1}),
+        (1, {"2": 1}, {"2-3": 1}),
+    ):
+        slot_counts = {str(slot): 0 for slot in range(1, 10)}
+        slot_counts.update(slots)
+        metrics.append(
+            {
+                "episodes": 10,
+                "failures": failures,
+                "episodes_with_focal_safety_event": 3,
+                "qualifying_failures_by_slot": slot_counts,
+                "qualifying_failures_by_kind": {
+                    "road_object_contact": 1,
+                    "vehicle_collision": 1,
+                    "nonvehicle_collision": 0,
+                },
+                "qualifying_vehicle_collision_pairs": pairs,
+            }
+        )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_id": "run-id",
+                "config": {"failure": {"scope": NONFOCAL_SYSTEM_FAILURE_SCOPE}},
+                "metrics": metrics,
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary = multiagent_artifact.summarize_nonfocal_system_run(tmp_path)
+    assert summary["total_episodes"] == 20
+    assert summary["total_qualifying_failure_episodes"] == 3
+    assert summary["qualifying_failure_rate"] == pytest.approx(0.15)
+    assert summary["ranked_failing_slots"][:2] == [
+        {"slot": 1, "qualifying_failure_episodes": 2},
+        {"slot": 2, "qualifying_failure_episodes": 2},
+    ]
+    assert summary["episodes_with_focal_safety_event_no_automatic_credit"] == 6

@@ -17,13 +17,16 @@ from ..adversary.environment import (
 )
 from ..adversary.failure import RAW_INFO_ORDER
 from ..victim.policy import assert_policy_frozen, select_deterministic
-from .clearance import minimum_pairwise_clearance
+from .clearance import minimum_pairwise_clearance, oriented_box_clearance
 
 
 AGENT_COUNT = 10
 ACTION_DIM = 91
 COMMAND_DIM = 3
 DISTURBANCE_DIM = 2
+ANY_CONTROLLED_FAILURE_SCOPE = "any_controlled_agent"
+NONFOCAL_SYSTEM_FAILURE_SCOPE = "nonfocal_slots_1_through_9_only"
+NONFOCAL_COLLISION_CONTACT_TOLERANCE_M = 1.0e-5
 
 
 class MultiAgentEnvironmentError(RuntimeError):
@@ -127,6 +130,72 @@ def _global_failure(raw_info: np.ndarray) -> tuple[bool, tuple[str, ...], np.nda
     return bool(np.any(failed_agents)), kinds, failed_agents
 
 
+def qualifying_nonfocal_collision_pairs(
+    raw_info: np.ndarray,
+    boxes: np.ndarray,
+) -> tuple[tuple[int, int], ...]:
+    """Attribute vehicle contacts only when both participants are slots 1-9."""
+
+    raw = _array(raw_info, (AGENT_COUNT, 5), "post-step raw info")
+    geometry = _array(boxes, (AGENT_COUNT, 5), "post-step oriented boxes", np.float64)
+    flags = raw[:, :3]
+    _require(bool(np.isin(flags, [0.0, 1.0]).all()), "safety flags must be binary")
+    vehicle_flags = raw[:, 1] != 0
+    pairs: list[tuple[int, int]] = []
+    for first in range(1, AGENT_COUNT):
+        if not vehicle_flags[first]:
+            continue
+        for second in range(first + 1, AGENT_COUNT):
+            if vehicle_flags[second] and oriented_box_clearance(
+                geometry[first], geometry[second]
+            ) <= NONFOCAL_COLLISION_CONTACT_TOLERANCE_M:
+                pairs.append((first, second))
+    return tuple(pairs)
+
+
+def classify_multiagent_failure(
+    raw_info: np.ndarray,
+    boxes: np.ndarray,
+    *,
+    scope: str,
+) -> tuple[bool, tuple[str, ...], np.ndarray]:
+    """Classify either the legacy any-agent event or the non-focal objective."""
+
+    if scope == ANY_CONTROLLED_FAILURE_SCOPE:
+        return _global_failure(raw_info)
+    _require(
+        scope == NONFOCAL_SYSTEM_FAILURE_SCOPE,
+        f"unsupported multi-agent failure scope: {scope}",
+    )
+    raw = _array(raw_info, (AGENT_COUNT, 5), "post-step raw info")
+    flags = raw[:, :3]
+    _require(bool(np.isin(flags, [0.0, 1.0]).all()), "safety flags must be binary")
+    agents = np.zeros(AGENT_COUNT, dtype=np.bool_)
+    road_agents = np.flatnonzero(raw[1:, 0] != 0) + 1
+    nonvehicle_agents = np.flatnonzero(raw[1:, 2] != 0) + 1
+    collision_pairs = qualifying_nonfocal_collision_pairs(raw, boxes)
+    agents[road_agents] = True
+    agents[nonvehicle_agents] = True
+    for first, second in collision_pairs:
+        agents[first] = True
+        agents[second] = True
+    kinds: list[str] = []
+    if road_agents.size:
+        kinds.append(RAW_INFO_ORDER[0])
+    if collision_pairs:
+        kinds.append(RAW_INFO_ORDER[1])
+    if nonvehicle_agents.size:
+        kinds.append(RAW_INFO_ORDER[2])
+    return bool(agents.any()), tuple(kinds), agents
+
+
+def _clearance_active_mask(done: np.ndarray, *, scope: str) -> np.ndarray:
+    active = ~np.asarray(done, dtype=np.bool_)
+    if scope == NONFOCAL_SYSTEM_FAILURE_SCOPE:
+        active[0] = False
+    return active
+
+
 @dataclass(frozen=True)
 class MultiAgentRollout:
     observations: np.ndarray
@@ -205,15 +274,22 @@ def run_multiagent_rollout(
     intervention: Any,
     max_steps: int,
     adversary_deterministic: bool = False,
+    failure_scope: str = ANY_CONTROLLED_FAILURE_SCOPE,
 ) -> MultiAgentRollout:
     """Run ten deterministic PPO agents, perturbing only slot zero."""
 
     _require(max_steps > 0, "max_steps must be positive")
     victim.assert_frozen()
     state = backend.reset()
+    _require(
+        failure_scope in {ANY_CONTROLLED_FAILURE_SCOPE, NONFOCAL_SYSTEM_FAILURE_SCOPE},
+        "unsupported multi-agent failure scope",
+    )
     initial_failed, _, _ = _global_failure(state.raw_info)
     _require(not initial_failed, "derived scene begins with a safety event")
-    initial_clearance, initial_pair = minimum_pairwise_clearance(state.boxes, ~state.done)
+    initial_clearance, initial_pair = minimum_pairwise_clearance(
+        state.boxes, _clearance_active_mask(state.done, scope=failure_scope)
+    )
     _require(np.isfinite(initial_clearance) and initial_clearance > 0, "derived scene begins touching or overlapping")
 
     observations = [state.observations]; raw_infos = [state.raw_info]; boxes = [state.boxes]; dones = [state.done]
@@ -235,9 +311,11 @@ def run_multiagent_rollout(
         commands = victim_decision.nominal_commands.copy()
         commands[0] = composed.applied_command
         successor = backend.step(commands)
-        failed, kinds, agent_flags = _global_failure(successor.raw_info)
+        failed, kinds, agent_flags = classify_multiagent_failure(
+            successor.raw_info, successor.boxes, scope=failure_scope
+        )
         goal_ever = goals[-1] | (successor.raw_info[:, 3] != 0)
-        active = ~successor.done
+        active = _clearance_active_mask(successor.done, scope=failure_scope)
         clearance, pair = minimum_pairwise_clearance(successor.boxes, active)
         if not np.isfinite(clearance):
             clearance, pair = clearances[-1], pairs[-1]

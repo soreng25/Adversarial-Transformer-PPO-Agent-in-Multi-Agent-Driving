@@ -43,7 +43,13 @@ from ..victim.policy import (
 )
 from .artifact import validate_multiagent_training_artifact
 from .clearance import oriented_box_corners
-from .environment import AGENT_COUNT, MultiAgentRollout, MultiAgentVictimPolicy, run_multiagent_rollout
+from .environment import (
+    AGENT_COUNT,
+    MultiAgentRollout,
+    MultiAgentVictimPolicy,
+    classify_multiagent_failure,
+    run_multiagent_rollout,
+)
 from .training import GPUDriveTenAgentBackend, _env_config, _episode_arrays, _payload
 
 
@@ -196,9 +202,16 @@ def compare_failure_replays(
 class _FrameCaptureBackend:
     """Decorate the native backend and render every returned simulator state."""
 
-    def __init__(self, backend: GPUDriveTenAgentBackend, *, zoom_radius: int):
+    def __init__(
+        self,
+        backend: GPUDriveTenAgentBackend,
+        *,
+        zoom_radius: int,
+        failure_scope: str,
+    ):
         self.backend = backend
         self.zoom_radius = int(zoom_radius)
+        self.failure_scope = failure_scope
         self.frames: list[np.ndarray] = []
 
     def _capture(self, state: Any) -> None:
@@ -225,13 +238,16 @@ class _FrameCaptureBackend:
             focal_x, focal_y, "  slot 0 (disturbed)", color="#d62728",
             fontsize=10, fontweight="bold", zorder=21,
         )
-        failing = np.flatnonzero(np.any(state.raw_info[:, :3] != 0, axis=1))
+        qualified, _, qualifying_agents = classify_multiagent_failure(
+            state.raw_info, state.boxes, scope=self.failure_scope
+        )
+        failing = np.flatnonzero(qualifying_agents)
         for slot in failing:
             x, y = state.boxes[int(slot), :2]
             axis.scatter([x], [y], marker="x", s=250, color="#ffbf00", linewidths=3, zorder=22)
             axis.text(x, y, f"  FAILURE slot {int(slot)}", color="#8c2d04", fontsize=10, fontweight="bold", zorder=23)
         label = f"t={self.backend.timestep} ({0.1 * self.backend.timestep:.1f} s)"
-        if failing.size:
+        if qualified:
             label += " -- first safety failure"
         figure.text(0.01, 0.99, label, va="top", ha="left", fontsize=12, fontweight="bold")
         figure.canvas.draw()
@@ -483,14 +499,20 @@ def render_highway_failure(
         first = run_multiagent_rollout(
             backend=backend, victim=victim, adversary=adversary,
             intervention=intervention, max_steps=91, adversary_deterministic=True,
+            failure_scope=config["failure"]["scope"],
         )
         _require(first.failure_timestep is not None, "selected checkpoint did not reproduce a deterministic failure")
         _require(first.failure_timestep == expected_failure, "replayed failure timestep differs from the training-time deterministic evaluation")
 
-        capturing_backend = _FrameCaptureBackend(backend, zoom_radius=zoom_radius)
+        capturing_backend = _FrameCaptureBackend(
+            backend,
+            zoom_radius=zoom_radius,
+            failure_scope=config["failure"]["scope"],
+        )
         second = run_multiagent_rollout(
             backend=capturing_backend, victim=victim, adversary=adversary,
             intervention=intervention, max_steps=91, adversary_deterministic=True,
+            failure_scope=config["failure"]["scope"],
         )
         comparison = compare_failure_replays(first, second)
         _require(comparison["ok"], "repeat deterministic replay did not match")

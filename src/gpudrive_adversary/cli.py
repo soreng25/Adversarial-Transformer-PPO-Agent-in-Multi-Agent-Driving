@@ -19,7 +19,11 @@ from .adversary.training_artifact import (
     validate_adversary_training_artifact,
 )
 from .doctor import build_doctor_report
-from .multiagent.artifact import validate_multiagent_training_artifact
+from .multiagent.artifact import (
+    MultiAgentArtifactError,
+    summarize_nonfocal_system_run,
+    validate_multiagent_training_artifact,
+)
 from .multiagent.environment import MultiAgentEnvironmentError
 from .multiagent.replay import MultiAgentReplayError, render_highway_failure
 from .multiagent.scene import MultiAgentSceneError
@@ -219,6 +223,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     highway_validate.add_argument("artifact", type=Path)
     highway_validate.add_argument("--output", type=Path)
+
+    highway_summary = subparsers.add_parser(
+        "summarize-highway-system-run",
+        help="Summarize qualifying slots-1-through-9 failures and collision pairs.",
+    )
+    highway_summary.add_argument("artifact", type=Path)
+    highway_summary.add_argument("--output", type=Path)
 
     highway_render = subparsers.add_parser(
         "render-highway-failure",
@@ -434,6 +445,11 @@ def main(argv: list[str] | None = None) -> int:
             _write_or_print(report, args.output)
             return 0 if report["ok"] else 1
 
+        if args.command == "summarize-highway-system-run":
+            report = summarize_nonfocal_system_run(args.artifact)
+            _write_or_print(report, args.output)
+            return 0
+
         if args.command == "render-highway-failure":
             manifest = render_highway_failure(
                 source=args.source,
@@ -467,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         AdversaryTrainingError,
         PinError,
         MultiAgentEnvironmentError,
+        MultiAgentArtifactError,
         MultiAgentReplayError,
         MultiAgentSceneError,
         MultiAgentTrainingError,
