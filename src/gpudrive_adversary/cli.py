@@ -234,6 +234,12 @@ def build_parser() -> argparse.ArgumentParser:
     highway_render.add_argument("--victim-pin", type=Path)
     highway_render.add_argument("--victim-checkpoint", type=Path)
     highway_render.add_argument("--zoom-radius", type=int, default=70)
+    highway_render.add_argument(
+        "--fps",
+        type=int,
+        default=10,
+        help="GIF playback frames per second (1-30; lower is slower).",
+    )
     highway_render.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -438,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
                 victim_pin_path=args.victim_pin,
                 gpudrive_pin_path=args.pins,
                 zoom_radius=args.zoom_radius,
+                fps=args.fps,
             )
             print(
                 json.dumps(

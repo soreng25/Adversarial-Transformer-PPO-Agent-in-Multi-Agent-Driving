@@ -111,6 +111,7 @@ def test_render_cli_contract() -> None:
     )
     assert args.checkpoint == "iteration-0094"
     assert args.zoom_radius == 70
+    assert args.fps == 10
 
 
 def test_camera_ignores_done_and_out_of_bounds_agents() -> None:

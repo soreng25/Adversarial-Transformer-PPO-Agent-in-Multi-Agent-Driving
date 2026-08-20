@@ -5,6 +5,7 @@ python_bin="${GPUDRIVE_PYTHON:-.deps/gpudrive/.venv/bin/python}"
 run="${GPUDRIVE_HIGHWAY_RUN:-artifacts/highway-10agent/train-100}"
 checkpoint="${1:-iteration-0094}"
 zoom_radius="${2:-70}"
+fps="${3:-10}"
 output="${GPUDRIVE_FAILURE_OUTPUT:-artifacts/highway-10agent/failure-${checkpoint#iteration-}}"
 
 [[ "$(uname -s)" == "Linux" ]] || { echo "Failure replay/rendering requires Linux/CUDA." >&2; exit 1; }
@@ -24,6 +25,7 @@ mkdir -p "$(dirname "${MADRONA_MWGPU_KERNEL_CACHE}")" "$(dirname "${output}")"
   --run "${run}" \
   --checkpoint "${checkpoint}" \
   --zoom-radius "${zoom_radius}" \
+  --fps "${fps}" \
   --output "${output}"
 
 printf 'Failure visualization ready: %s\n' "${output}"

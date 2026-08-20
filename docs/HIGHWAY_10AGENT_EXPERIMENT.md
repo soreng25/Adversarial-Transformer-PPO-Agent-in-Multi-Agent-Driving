@@ -83,12 +83,14 @@ the recorded failure or if the repeated replay differs. This command provides
 a same-process repeat-replay check; the separate fresh-process replay gate
 required for the complete Milestone D research artifact remains to be added.
 
-To use another output directory or a wider minimum camera radius, pass the
-radius as the second argument and set the output environment variable:
+To use another output directory, a wider minimum camera radius, or slower GIF
+playback, pass radius as the second argument and frames per second as the third.
+For example, `3` fps is about one-third real-time because the simulator advances
+at 10 steps per simulated second:
 
 ```bash
 GPUDRIVE_FAILURE_OUTPUT=artifacts/highway-10agent/failure-0094-wide \
-  bash scripts/render_highway_failure.sh iteration-0094 90
+  bash scripts/render_highway_failure.sh iteration-0094 90 3
 ```
 
 After completion:

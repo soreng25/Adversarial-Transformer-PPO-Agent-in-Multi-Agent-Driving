@@ -279,6 +279,7 @@ def _write_diagnostic_plots(
     *,
     object_ids: list[int],
     frames: list[np.ndarray],
+    fps: int,
 ) -> None:
     try:
         import matplotlib
@@ -354,7 +355,7 @@ def _write_diagnostic_plots(
         output / "failure.gif",
         save_all=True,
         append_images=images[1:],
-        duration=100,
+        duration=int(round(1000.0 / fps)),
         loop=0,
         optimize=False,
     )
@@ -369,11 +370,13 @@ def render_highway_failure(
     victim_pin_path: Path | None = None,
     gpudrive_pin_path: Path | None = None,
     zoom_radius: int = 70,
+    fps: int = 10,
 ) -> dict[str, Any]:
     """Replay a deterministic learned failure twice and export visual evidence."""
 
     _require(platform.system() == "Linux", "failure replay/rendering is Linux/CUDA only")
     _require(zoom_radius > 0, "zoom radius must be positive")
+    _require(1 <= fps <= 30, "GIF fps must be between 1 and 30")
     _require(not output.exists(), f"visualization output already exists: {output}")
     run = run.resolve()
     validation = validate_multiagent_training_artifact(run)
@@ -500,6 +503,7 @@ def render_highway_failure(
             second,
             object_ids=expected_ids,
             frames=capturing_backend.frames,
+            fps=fps,
         )
 
         files = {}
@@ -522,7 +526,7 @@ def render_highway_failure(
             "scene_identity": run_manifest["scene_identity"],
             "failure": failure_signature(second),
             "replay_certificate": comparison,
-            "render": {"fps": 10, "frame_count": len(capturing_backend.frames), "zoom_radius_m": zoom_radius},
+            "render": {"fps": fps, "frame_count": len(capturing_backend.frames), "zoom_radius_m": zoom_radius},
             "files": files,
             "runtime": {
                 "platform": platform.platform(), "python": sys.version,
