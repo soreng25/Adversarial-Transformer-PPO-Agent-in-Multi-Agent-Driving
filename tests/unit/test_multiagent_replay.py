@@ -10,6 +10,7 @@ from gpudrive_adversary.cli import build_parser
 from gpudrive_adversary.multiagent.environment import MultiAgentRollout
 from gpudrive_adversary.multiagent.replay import (
     _FrameCaptureBackend,
+    _camera_center_agent,
     _camera_zoom_radius,
     _visible_position_mask,
     MultiAgentReplayError,
@@ -128,3 +129,19 @@ def test_camera_ignores_done_and_out_of_bounds_agents() -> None:
     assert _visible_position_mask(State.boxes).tolist() == [True, True, False]
     assert _camera_zoom_radius(State(), 20) == 40
     assert callable(_FrameCaptureBackend.step)
+
+
+def test_camera_follows_failure_agent_after_focal_agent_is_padded() -> None:
+    class State:
+        boxes = np.asarray(
+            [
+                [-11000.0, -11000.0, 0.0, 4.0, 2.0],
+                [10.0, 30.0, 0.0, 4.0, 2.0],
+                [35.0, 30.0, 0.0, 4.0, 2.0],
+            ]
+        )
+        done = np.asarray([True, False, False])
+
+    assert _camera_center_agent(State(), 1) == 1
+    assert _camera_center_agent(State(), 0) == 1
+    assert _camera_zoom_radius(State(), 20, center_agent_idx=1) == 35

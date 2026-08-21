@@ -208,10 +208,12 @@ class _FrameCaptureBackend:
         *,
         zoom_radius: int,
         failure_scope: str,
+        center_agent_idx: int,
     ):
         self.backend = backend
         self.zoom_radius = int(zoom_radius)
         self.failure_scope = failure_scope
+        self.center_agent_idx = int(center_agent_idx)
         self.frames: list[np.ndarray] = []
 
     def _capture(self, state: Any) -> None:
@@ -219,30 +221,39 @@ class _FrameCaptureBackend:
             import matplotlib.pyplot as plt
         except Exception as exc:
             raise MultiAgentReplayError(f"Matplotlib visualization import failed: {exc}") from exc
+        center_agent_idx = _camera_center_agent(state, self.center_agent_idx)
         figures = self.backend.env.vis.plot_simulator_state(
             env_indices=[0],
             time_steps=[self.backend.timestep],
-            center_agent_indices=[0],
-            zoom_radius=_camera_zoom_radius(state, self.zoom_radius),
+            center_agent_indices=[center_agent_idx],
+            zoom_radius=_camera_zoom_radius(
+                state,
+                self.zoom_radius,
+                center_agent_idx=center_agent_idx,
+            ),
             plot_log_replay_trajectory=False,
         )
         _require(len(figures) == 1, "GPUDrive returned an unexpected number of figures")
         figure = figures[0]
         axis = figure.axes[0]
-        focal_x, focal_y = state.boxes[0, :2]
-        axis.scatter(
-            [focal_x], [focal_y], s=500, facecolors="none", edgecolors="#d62728",
-            linewidths=2.5, zorder=20,
-        )
-        axis.text(
-            focal_x, focal_y, "  slot 0 (disturbed)", color="#d62728",
-            fontsize=10, fontweight="bold", zorder=21,
-        )
+        visible_positions = _visible_position_mask(state.boxes)
+        if visible_positions[0]:
+            focal_x, focal_y = state.boxes[0, :2]
+            axis.scatter(
+                [focal_x], [focal_y], s=500, facecolors="none", edgecolors="#d62728",
+                linewidths=2.5, zorder=20,
+            )
+            axis.text(
+                focal_x, focal_y, "  slot 0 (disturbed)", color="#d62728",
+                fontsize=10, fontweight="bold", zorder=21,
+            )
         qualified, _, qualifying_agents = classify_multiagent_failure(
             state.raw_info, state.boxes, scope=self.failure_scope
         )
         failing = np.flatnonzero(qualifying_agents)
         for slot in failing:
+            if not visible_positions[int(slot)]:
+                continue
             x, y = state.boxes[int(slot), :2]
             axis.scatter([x], [y], marker="x", s=250, color="#ffbf00", linewidths=3, zorder=22)
             axis.text(x, y, f"  FAILURE slot {int(slot)}", color="#8c2d04", fontsize=10, fontweight="bold", zorder=23)
@@ -274,19 +285,32 @@ def _visible_position_mask(boxes: np.ndarray) -> np.ndarray:
     return np.isfinite(centers).all(axis=-1) & (np.abs(centers) < 900.0).all(axis=-1)
 
 
-def _camera_zoom_radius(state: Any, minimum_radius: int) -> int:
-    """Frame only live, in-bounds agents so removed cars cannot expand the view."""
+def _camera_center_agent(state: Any, preferred_agent_idx: int) -> int:
+    """Use the preferred live position, falling back from padded agents."""
+
+    boxes = np.asarray(state.boxes, dtype=np.float64)
+    visible = _visible_position_mask(boxes)
+    _require(0 <= preferred_agent_idx < boxes.shape[0], "camera agent index is outside the trace")
+    if visible[preferred_agent_idx]:
+        return int(preferred_agent_idx)
+    live = np.flatnonzero(visible & ~np.asarray(state.done, dtype=np.bool_))
+    if live.size:
+        return int(live[0])
+    in_bounds = np.flatnonzero(visible)
+    return int(in_bounds[0]) if in_bounds.size else int(preferred_agent_idx)
+
+
+def _camera_zoom_radius(state: Any, minimum_radius: int, *, center_agent_idx: int = 0) -> int:
+    """Frame only live, in-bounds agents relative to the actual camera center."""
 
     boxes = np.asarray(state.boxes, dtype=np.float64)
     visible = _visible_position_mask(boxes) & ~np.asarray(state.done, dtype=np.bool_)
-    # Keep the focal car as the center even if a future collision mode marks it
-    # done on the failure transition. Its coordinates must still be in bounds.
-    if _visible_position_mask(boxes[[0]])[0]:
-        visible[0] = True
+    if _visible_position_mask(boxes[[center_agent_idx]])[0]:
+        visible[center_agent_idx] = True
     centers = boxes[visible, :2]
     if centers.size == 0:
         return int(minimum_radius)
-    farthest = float(np.linalg.norm(centers - boxes[0, :2], axis=1).max())
+    farthest = float(np.linalg.norm(centers - boxes[center_agent_idx, :2], axis=1).max())
     return max(int(minimum_radius), int(np.ceil(farthest)) + 10)
 
 def _write_diagnostic_plots(
@@ -503,11 +527,15 @@ def render_highway_failure(
         )
         _require(first.failure_timestep is not None, "selected checkpoint did not reproduce a deterministic failure")
         _require(first.failure_timestep == expected_failure, "replayed failure timestep differs from the training-time deterministic evaluation")
+        failure_slots = np.flatnonzero(first.failing_agents[first.failure_timestep])
+        _require(failure_slots.size > 0, "replayed failure has no attributed agent")
+        camera_agent_slot = int(failure_slots[0])
 
         capturing_backend = _FrameCaptureBackend(
             backend,
             zoom_radius=zoom_radius,
             failure_scope=config["failure"]["scope"],
+            center_agent_idx=camera_agent_slot,
         )
         second = run_multiagent_rollout(
             backend=capturing_backend, victim=victim, adversary=adversary,
@@ -548,7 +576,12 @@ def render_highway_failure(
             "scene_identity": run_manifest["scene_identity"],
             "failure": failure_signature(second),
             "replay_certificate": comparison,
-            "render": {"fps": fps, "frame_count": len(capturing_backend.frames), "zoom_radius_m": zoom_radius},
+            "render": {
+                "fps": fps,
+                "frame_count": len(capturing_backend.frames),
+                "zoom_radius_m": zoom_radius,
+                "camera_agent_slot": camera_agent_slot,
+            },
             "files": files,
             "runtime": {
                 "platform": platform.platform(), "python": sys.version,
