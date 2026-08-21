@@ -1,0 +1,33 @@
+{
+  "schema": "gpudrive_highway_bound_sweep_config",
+  "schema_version": 1,
+  "purpose": "calibrate_random_nonfocal_failure_rate_before_ppo_training",
+  "episodes_per_bound": 500,
+  "seed": 42,
+  "target_random_failure_rate": [0.01, 0.05],
+  "sampling": {
+    "family": "iid_zero_mean_tanh_normal",
+    "latent_standard_deviation": [0.5, 0.5],
+    "common_random_latents_across_bounds": true
+  },
+  "bounds": [
+    {
+      "name": "current",
+      "scale": 1.0,
+      "acceleration": 0.667,
+      "steering": 0.262
+    },
+    {
+      "name": "half",
+      "scale": 0.5,
+      "acceleration": 0.3335,
+      "steering": 0.131
+    },
+    {
+      "name": "quarter",
+      "scale": 0.25,
+      "acceleration": 0.16675,
+      "steering": 0.0655
+    }
+  ]
+}

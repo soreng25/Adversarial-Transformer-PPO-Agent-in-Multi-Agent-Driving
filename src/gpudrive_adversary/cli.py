@@ -24,6 +24,7 @@ from .multiagent.artifact import (
     summarize_nonfocal_system_run,
     validate_multiagent_training_artifact,
 )
+from .multiagent.calibration import BoundCalibrationError, run_highway_bound_sweep
 from .multiagent.environment import MultiAgentEnvironmentError
 from .multiagent.replay import MultiAgentReplayError, render_highway_failure
 from .multiagent.scene import MultiAgentSceneError
@@ -216,6 +217,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Pinned original GPUDrive-mini JSON (default: .deps/datasets/GPUDrive_mini/<configured path>).",
     )
     highway_train.add_argument("--output", type=Path, required=True)
+
+    highway_bound_sweep = subparsers.add_parser(
+        "highway-bound-sweep",
+        help="Measure random-prior failure rates at several disturbance bounds without PPO updates.",
+    )
+    _add_pin_and_source(highway_bound_sweep)
+    highway_bound_sweep.add_argument("--victim-pin", type=Path)
+    highway_bound_sweep.add_argument("--victim-checkpoint", type=Path)
+    highway_bound_sweep.add_argument("--adversary-config", type=Path)
+    highway_bound_sweep.add_argument("--experiment-config", type=Path)
+    highway_bound_sweep.add_argument("--sweep-config", type=Path)
+    highway_bound_sweep.add_argument("--scene-source", type=Path)
+    highway_bound_sweep.add_argument("--episodes-per-bound", type=int)
+    highway_bound_sweep.add_argument("--output", type=Path, required=True)
 
     highway_validate = subparsers.add_parser(
         "validate-highway-run",
@@ -440,6 +455,22 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"ok": True, "artifact": str(args.output.resolve()), "artifact_id": manifest["artifact_id"], "clean_eligibility": manifest["clean_eligibility"], "final_metrics": manifest["metrics"][-1]}, indent=2, sort_keys=True))
             return 0
 
+        if args.command == "highway-bound-sweep":
+            manifest = run_highway_bound_sweep(
+                source=args.source,
+                output=args.output,
+                checkpoint_directory=args.victim_checkpoint,
+                scene_source=args.scene_source,
+                adversary_config_path=args.adversary_config,
+                experiment_config_path=args.experiment_config,
+                sweep_config_path=args.sweep_config,
+                victim_pin_path=args.victim_pin,
+                gpudrive_pin_path=args.pins,
+                episodes_per_bound=args.episodes_per_bound,
+            )
+            print(json.dumps({"ok": True, "artifact": str(args.output.resolve()), "artifact_id": manifest["artifact_id"], "results": manifest["results"]}, indent=2, sort_keys=True))
+            return 0
+
         if args.command == "validate-highway-run":
             report = validate_multiagent_training_artifact(args.artifact)
             _write_or_print(report, args.output)
@@ -481,6 +512,7 @@ def main(argv: list[str] | None = None) -> int:
         AdversaryConfigError,
         AdversaryTrainingArtifactError,
         AdversaryTrainingError,
+        BoundCalibrationError,
         PinError,
         MultiAgentEnvironmentError,
         MultiAgentArtifactError,
